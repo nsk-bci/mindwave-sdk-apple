@@ -14,7 +14,7 @@ final class SimulatorIntegrationTests: XCTestCase {
         let sdk = NeuroSkySdk(simulator: .random)
         var states: [ConnectionState] = []
 
-        let collectTask = Task {
+        let collectTask = Task { @MainActor in
             for await state in sdk.stateStream {
                 states.append(state)
                 if state == .connected { break }
@@ -33,7 +33,7 @@ final class SimulatorIntegrationTests: XCTestCase {
         try await sdk.connect("sim")
 
         var receivedDisconnected = false
-        let collectTask = Task {
+        let collectTask = Task { @MainActor in
             for await state in sdk.stateStream {
                 if state == .disconnected { receivedDisconnected = true; break }
             }
@@ -134,7 +134,7 @@ final class SimulatorIntegrationTests: XCTestCase {
         try await sdk.connect("sim")
 
         var count = 0
-        let collectTask = Task {
+        let collectTask = Task { @MainActor in
             for await _ in sdk.dataStream {
                 count += 1
                 if count >= 3 { break }
