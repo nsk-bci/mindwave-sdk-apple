@@ -21,6 +21,11 @@ public final class BLETransport: NSObject, Transport {
 
     // MARK: - 내부 상태
 
+    // BLETransport 내부에서만 사용하는 CBUUID 인스턴스
+    private let esenseUUID    = CBUUID(string: NeuroSkyUUID.esense)
+    private let handshakeUUID = CBUUID(string: NeuroSkyUUID.handshake)
+    private let rawEegUUID    = CBUUID(string: NeuroSkyUUID.rawEeg)
+
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var handshakeChar: CBCharacteristic?
@@ -92,8 +97,8 @@ public final class BLETransport: NSObject, Transport {
     /// esense + rawEeg 둘 다 notification 활성화된 후 연결 완료 처리
     private func resumeIfFullyConnected() {
         let required: Set<String> = [
-            NeuroSkyUUID.esense.uuidString,
-            NeuroSkyUUID.rawEeg.uuidString
+            esenseUUID.uuidString,
+            rawEegUUID.uuidString
         ]
         guard required.isSubset(of: notifiedCharacteristics),
               handshakeChar != nil else { return }
@@ -179,13 +184,10 @@ extension BLETransport: CBPeripheralDelegate {
     ) {
         guard let chars = service.characteristics else { return }
         for char in chars {
-            switch char.uuid {
-            case NeuroSkyUUID.esense, NeuroSkyUUID.rawEeg:
+            if char.uuid == esenseUUID || char.uuid == rawEegUUID {
                 setupNotification(for: char, peripheral: peripheral)
-            case NeuroSkyUUID.handshake:
+            } else if char.uuid == handshakeUUID {
                 handshakeChar = char
-            default:
-                break
             }
         }
     }
@@ -207,15 +209,12 @@ extension BLETransport: CBPeripheralDelegate {
     ) {
         guard let data = characteristic.value else { return }
 
-        switch characteristic.uuid {
-        case NeuroSkyUUID.esense:
+        if characteristic.uuid == esenseUUID {
             if let brainData = parser.parseEsense(data) {
                 dataContinuation.yield(brainData)
             }
-        case NeuroSkyUUID.rawEeg:
+        } else if characteristic.uuid == rawEegUUID {
             dataContinuation.yield(parser.parseRawEeg(data))
-        default:
-            break
         }
     }
 }
