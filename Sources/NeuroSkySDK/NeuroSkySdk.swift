@@ -74,6 +74,12 @@ public final class NeuroSkySdk {
     /// iOS: BLE 전용
     /// macOS: BLE 우선 → 5초 내 실패 시 BT Classic 자동 폴백
     public func connect(_ deviceAddress: String) async throws {
+        // Simulator 모드: 이미 설정된 SimulatorTransport를 직접 사용
+        if let sim = activeTransport as? SimulatorTransport {
+            try await sim.connect(to: deviceAddress)
+            return
+        }
+
         #if os(macOS)
         do {
             try await connectBLE(deviceAddress)
