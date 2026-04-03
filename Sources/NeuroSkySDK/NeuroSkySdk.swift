@@ -150,18 +150,20 @@ public final class NeuroSkySdk {
 
     /// transport의 dataStream/stateStream을 SDK의 단일 스트림으로 포워딩
     private func startForwarding(from transport: any Transport) {
-        forwardTask = Task { [weak self] in
+        let dataCont  = dataContinuation
+        let stateCont = stateContinuation
+        forwardTask = Task {
             await withTaskGroup(of: Void.self) { group in
                 group.addTask {
                     for await data in transport.dataStream {
                         guard !Task.isCancelled else { break }
-                        self?.dataContinuation.yield(data)
+                        dataCont.yield(data)
                     }
                 }
                 group.addTask {
                     for await state in transport.stateStream {
                         guard !Task.isCancelled else { break }
-                        self?.stateContinuation.yield(state)
+                        stateCont.yield(state)
                     }
                 }
             }
