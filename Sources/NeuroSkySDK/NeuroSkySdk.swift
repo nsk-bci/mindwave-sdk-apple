@@ -35,10 +35,10 @@ public final class NeuroSkySdk {
     private var activeTransport: (any Transport)?
     private var forwardTask: Task<Void, Never>?
 
-    private let bleTransport = BLETransport()
+    private lazy var bleTransport = BLETransport()
 
     #if os(macOS)
-    private let btClassicTransport = BTClassicTransport()
+    private lazy var btClassicTransport = BTClassicTransport()
     #endif
 
     // MARK: - Init
