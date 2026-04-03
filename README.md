@@ -1,41 +1,39 @@
 # NeuroSky MindWave SDK — Apple (iOS / macOS)
 
-Swift Package Manager 기반 NeuroSky MindWave EEG 헤드셋 SDK.  
-TGC(ThinkGear Connector) 없이 BLE 직접 연결, macOS는 BT Classic 폴백 지원.
+Swift Package Manager SDK for NeuroSky MindWave EEG headsets.  
+Direct BLE connection without ThinkGear Connector (TGC). macOS also supports BT Classic fallback.
 
 ---
 
-## 요구 사항
+## Requirements
 
-| 플랫폼 | 최소 버전 | 연결 방식 |
-|--------|----------|-----------|
-| iOS    | 14.0+    | BLE 전용 |
-| macOS  | 11.0+    | BLE 우선 → BT Classic 폴백 |
+| Platform | Minimum Version | Connection |
+|----------|----------------|------------|
+| iOS      | 14.0+          | BLE only |
+| macOS    | 11.0+          | BLE first → BT Classic fallback |
 
 Swift 5.7+ / Xcode 14+
 
 ---
 
-## 설치
+## Installation
 
 ### Swift Package Manager
 
-**Xcode:** File → Add Package Dependencies → GitHub URL 입력
+**Xcode:** File → Add Package Dependencies → enter the URL below
 
 **Package.swift:**
 ```swift
 dependencies: [
-    .package(url: "https://github.com/<your-org>/neurosky-sdk-apple", from: "2.0.0")
+    .package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "1.0.0")
 ]
 ```
 
-> GitHub 배포 후 URL을 실제 저장소 주소로 교체하세요.
-
 ---
 
-## 빠른 시작
+## Quick Start
 
-> `NeuroSkySdk`는 `@MainActor` 클래스입니다. `Task {}` 또는 SwiftUI `.task {}` 안에서 사용하세요.
+> `NeuroSkySdk` is a `@MainActor` class. Use it inside `Task {}` or SwiftUI `.task {}`.
 
 ```swift
 import NeuroSkySDK
@@ -43,7 +41,7 @@ import NeuroSkySDK
 let sdk = NeuroSkySdk()
 
 Task {
-    // BLE 우선 연결 (macOS: 5초 실패 시 BT Classic 자동 폴백)
+    // BLE-first connection (macOS: auto-falls back to BT Classic after 5 s)
     try await sdk.connect("MindWave Mobile")
 
     for await data in sdk.dataStream {
@@ -54,29 +52,29 @@ Task {
 }
 ```
 
-### Simulator 모드 (실기기 불필요)
+### Simulator Mode (no hardware required)
 
 ```swift
 let sdk = NeuroSkySdk(simulator: .focused)
 
 Task {
-    try await sdk.connect("sim")  // 주소 무시
+    try await sdk.connect("sim")  // address is ignored
 
     for await data in sdk.dataStream {
-        print(data.attention)  // 70~95 범위 값
+        print(data.attention)  // values in the 70–95 range
     }
 }
 ```
 
 ---
 
-## 권한 설정
+## Permissions
 
 ### iOS — Info.plist
 
 ```xml
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>MindWave 헤드셋 연결에 블루투스가 필요합니다.</string>
+<string>Bluetooth is required to connect to the MindWave headset.</string>
 ```
 
 ### macOS — Info.plist + Entitlements
@@ -84,26 +82,26 @@ Task {
 ```xml
 <!-- Info.plist -->
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>MindWave 헤드셋 연결에 블루투스가 필요합니다.</string>
+<string>Bluetooth is required to connect to the MindWave headset.</string>
 ```
 
 ```xml
-<!-- App.entitlements (BT Classic 사용 시) -->
+<!-- App.entitlements (required for BT Classic) -->
 <key>com.apple.security.device.bluetooth</key>
 <true/>
 ```
 
-Sandbox 앱은 `com.apple.security.device.bluetooth` entitlement 필수.
+Sandboxed apps must include the `com.apple.security.device.bluetooth` entitlement.
 
 ---
 
-## Raw EEG 수신
+## Raw EEG
 
 ```swift
 try await sdk.startRawEeg()
 
 for await data in sdk.dataStream {
-    // data.rawEeg: 패킷당 10샘플, 512 Hz
+    // data.rawEeg: 10 samples per packet at 512 Hz
     print(data.rawEeg)
 }
 
@@ -112,35 +110,35 @@ try await sdk.stopRawEeg()
 
 ---
 
-## 노치 필터 설정
+## Notch Filter
 
 ```swift
-try await sdk.setNotch60Hz()  // 한국/미국 (기본값 권장)
-try await sdk.setNotch50Hz()  // 중국/유럽
+try await sdk.setNotch60Hz()  // Korea / USA (recommended default)
+try await sdk.setNotch50Hz()  // China / Europe
 ```
 
 ---
 
-## 파일 구조
+## File Structure
 
 ```
 Sources/NeuroSkySDK/
-├── NeuroSkySdk.swift           진입점 (BLE 폴백 로직 포함)
-├── NeuroSkyUUID.swift          UUID / 명령 상수
+├── NeuroSkySdk.swift            Entry point (BLE fallback logic)
+├── NeuroSkyUUID.swift           UUID and command constants
 ├── Model/
-│   └── BrainWaveData.swift     데이터 모델
+│   └── BrainWaveData.swift      Data model
 ├── Parser/
-│   └── ThinkGearParser.swift   패킷 파서
+│   └── ThinkGearParser.swift    Packet parser
 ├── Transport/
-│   ├── Transport.swift         공통 프로토콜
-│   ├── BLETransport.swift      CoreBluetooth (iOS + macOS)
+│   ├── Transport.swift          Common protocol
+│   ├── BLETransport.swift       CoreBluetooth (iOS + macOS)
 │   └── BTClassicTransport.swift IOBluetooth (macOS only)
 └── Simulator/
-    └── SimulatorTransport.swift 개발용 시뮬레이터
+    └── SimulatorTransport.swift Developer simulator
 ```
 
 ---
 
-## 라이선스
+## License
 
 MIT
