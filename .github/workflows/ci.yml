@@ -21,8 +21,11 @@ jobs:
       - name: Build (macOS)
         run: swift build -v
 
-      - name: Test (macOS)
-        run: swift test -v
+      - name: Test — Parser (macOS)
+        run: swift test -v --filter ThinkGearParserTests
+
+      - name: Test — Simulator Integration (macOS)
+        run: swift test -v --filter SimulatorIntegrationTests
 
       # iOS: xcodebuild로 컴파일 검증 (실행은 시뮬레이터 필요 없음)
       - name: Build (iOS Simulator)
