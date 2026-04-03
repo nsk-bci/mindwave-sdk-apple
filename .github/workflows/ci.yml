@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-14          # Apple Silicon, Xcode 15+
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      # macOS: swift build + swift test (CoreBluetooth + IOBluetooth 포함)
+      - name: Build (macOS)
+        run: swift build -v
+
+      - name: Test (macOS)
+        run: swift test -v
+
+      # iOS: xcodebuild로 컴파일 검증 (실행은 시뮬레이터 필요 없음)
+      - name: Build (iOS Simulator)
+        run: |
+          xcodebuild build \
+            -scheme NeuroSkySDK \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=YES
