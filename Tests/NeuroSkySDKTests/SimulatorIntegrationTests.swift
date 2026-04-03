@@ -5,13 +5,12 @@ import XCTest
 ///
 /// Covers the full lifecycle that would occur with a physical MindWave headset:
 ///   connect → receive data → verify values → disconnect
-@MainActor
 final class SimulatorIntegrationTests: XCTestCase {
 
     // MARK: - Connection lifecycle
 
     func test_connect_yieldsConnectingThenConnected() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
         var states: [ConnectionState] = []
 
         let collectTask = Task { @MainActor in
@@ -28,7 +27,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_disconnect_yieldsDisconnected() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
 
         try await sdk.connect("sim")
 
@@ -48,7 +47,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     // MARK: - Data stream
 
     func test_focused_attentionInExpectedRange() async throws {
-        let sdk = NeuroSkySdk(simulator: .focused)
+        let sdk = await NeuroSkySdk(simulator: .focused)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -63,7 +62,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_relaxed_meditationInExpectedRange() async throws {
-        let sdk = NeuroSkySdk(simulator: .relaxed)
+        let sdk = await NeuroSkySdk(simulator: .relaxed)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -78,7 +77,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_poorSignal_signalQualityIsNoSignal() async throws {
-        let sdk = NeuroSkySdk(simulator: .poorSignal)
+        let sdk = await NeuroSkySdk(simulator: .poorSignal)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -90,7 +89,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_random_eegBandsArePositive() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -103,7 +102,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_rawEeg_has10SamplesPerPacket() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -114,7 +113,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     }
 
     func test_rawEeg_samplesInValidRange() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
         try await sdk.connect("sim")
 
         let data = try await firstData(from: sdk)
@@ -130,7 +129,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     // MARK: - Multiple packets
 
     func test_receivesMultiplePacketsOverTime() async throws {
-        let sdk = NeuroSkySdk(simulator: .focused)
+        let sdk = await NeuroSkySdk(simulator: .focused)
         try await sdk.connect("sim")
 
         var count = 0
@@ -152,7 +151,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     // MARK: - sendCommand (no-op in simulator)
 
     func test_sendCommand_doesNotThrow() async throws {
-        let sdk = NeuroSkySdk(simulator: .random)
+        let sdk = await NeuroSkySdk(simulator: .random)
         try await sdk.connect("sim")
 
         await XCTAssertNoThrowAsync(try await sdk.startRawEeg())
@@ -168,7 +167,7 @@ final class SimulatorIntegrationTests: XCTestCase {
     /// Collects the first BrainWaveData packet with a 5-second timeout.
     private func firstData(from sdk: NeuroSkySdk) async throws -> BrainWaveData {
         try await withThrowingTaskGroup(of: BrainWaveData.self) { group in
-            group.addTask {
+            group.addTask { @MainActor in
                 for await data in sdk.dataStream { return data }
                 throw XCTestError(.timeoutWhileWaiting)
             }

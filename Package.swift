@@ -7,6 +7,7 @@ let package = Package(
         .iOS(.v14),
         .macOS(.v11),
     ],
+    swiftLanguageVersions: [.v5],
     products: [
         .library(
             name: "NeuroSkySDK",
