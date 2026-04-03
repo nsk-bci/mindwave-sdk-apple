@@ -6,7 +6,7 @@
 [![SPM](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange)](https://github.com/nsk-bci/mindwave-sdk-apple)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic, no ThinkGear Connector required.
+Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 
 ---
 

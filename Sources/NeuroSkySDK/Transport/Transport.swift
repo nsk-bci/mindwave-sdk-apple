@@ -9,6 +9,21 @@ public enum ConnectionState: Sendable {
     case error(Error)
 }
 
+extension ConnectionState: Equatable {
+    public static func == (lhs: ConnectionState, rhs: ConnectionState) -> Bool {
+        switch (lhs, rhs) {
+        case (.disconnected, .disconnected),
+             (.scanning, .scanning),
+             (.connecting, .connecting),
+             (.connected, .connected),
+             (.error, .error):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 /// BLE / BT Classic 공통 Transport 프로토콜
 public protocol Transport: AnyObject {
     /// 수신된 BrainWaveData 스트림
