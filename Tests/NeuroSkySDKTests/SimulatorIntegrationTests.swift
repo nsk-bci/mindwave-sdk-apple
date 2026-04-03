@@ -5,6 +5,7 @@ import XCTest
 ///
 /// Covers the full lifecycle that would occur with a physical MindWave headset:
 ///   connect → receive data → verify values → disconnect
+@MainActor
 final class SimulatorIntegrationTests: XCTestCase {
 
     // MARK: - Connection lifecycle

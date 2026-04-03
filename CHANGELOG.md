@@ -12,6 +12,3 @@
 - AsyncStream 기반 dataStream / stateStream API
 - `@MainActor` 적용으로 UI 업데이트 안전성 보장
 
-### 제거
-- TGC(ThinkGear Connector) 의존성 완전 제거
-- Objective-C 레거시 API 제거

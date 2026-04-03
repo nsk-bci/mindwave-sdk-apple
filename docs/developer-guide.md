@@ -30,19 +30,12 @@ title: NeuroSky MindWave Mobile Apple SDK — Developer Guide
 
 ## 1. Overview
 
-The **NeuroSky MindWave Mobile Apple SDK** is a modern Swift library that lets you read real-time EEG (electroencephalography) data from a NeuroSky MindWave Mobile headset on iOS 14+ and macOS 11+ — with zero dependency on NeuroSky's legacy ThinkGear Connector (TGC) software.
-
-### Why this SDK exists
-
-The official NeuroSky SDK requires TGC running on a paired PC and is built on legacy Objective-C APIs that do not integrate naturally with modern Swift development patterns (async/await, AsyncStream, SwiftUI).
-
-This SDK eliminates TGC entirely by communicating directly with the MindWave Mobile hardware via Apple's Bluetooth frameworks. It is built on Swift Concurrency — `async/await` and `AsyncStream` — the standard async primitives in modern Swift.
+The **NeuroSky MindWave Mobile Apple SDK** is a modern Swift library that lets you read real-time EEG (electroencephalography) data from a NeuroSky MindWave Mobile headset on iOS 14+ and macOS 11+.
 
 ### Key features
 
 | Feature | Description |
 |---|---|
-| No TGC dependency | Communicates with hardware directly via CoreBluetooth / IOBluetooth |
 | BLE + BT Classic | iOS: BLE. macOS: BLE with automatic BT Classic fallback |
 | Swift Concurrency | `AsyncStream<BrainWaveData>` — integrates naturally with SwiftUI `.task {}` |
 | Built-in Simulator | Full data simulation without any hardware |
