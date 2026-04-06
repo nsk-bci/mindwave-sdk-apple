@@ -1,8 +1,5 @@
 # NeuroSky MindWave Mobile Apple SDK
 
-> [!TIP]
-> The full [Developer Guide (PDF)](docs/developer-guide.pdf) covers architecture, all connection modes, packet timing, signal quality handling, advanced patterns, and the complete API reference.
-
 [![Swift](https://img.shields.io/badge/Swift-5.7+-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/platforms-iOS%2014%2B%20%7C%20macOS%2011%2B-lightgrey?logo=apple&logoColor=white)](https://github.com/nsk-bci/mindwave-sdk-apple)
 [![SPM](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange)](https://github.com/nsk-bci/mindwave-sdk-apple)
@@ -13,6 +10,10 @@ Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 ---
 
 ## Getting Started
+
+> [!TIP]
+> Before diving into the steps — read the [Developer Guide (PDF)](docs/developer-guide.pdf) first.
+> It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add the package
 
