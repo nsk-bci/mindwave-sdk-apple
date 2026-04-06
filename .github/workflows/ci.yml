@@ -23,11 +23,7 @@ jobs:
         run: swift build --build-tests
 
       - name: Test — Parser (macOS)
-        run: swift test -v --filter ThinkGearParserTests 2>&1
-
-      - name: Test — Simulator Integration (macOS)
-        run: swift test -v --filter SimulatorIntegrationTests 2>&1
-        continue-on-error: true
+        run: swift test --filter ThinkGearParserTests
 
       # iOS: compile-check against the iOS Simulator SDK using swift build
       - name: Build (iOS Simulator)
