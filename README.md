@@ -1,6 +1,5 @@
 # NeuroSky MindWave Mobile Apple SDK
 
-[![CI](https://github.com/nsk-bci/mindwave-sdk-apple/actions/workflows/ci.yml/badge.svg)](https://github.com/nsk-bci/mindwave-sdk-apple/actions/workflows/ci.yml)
 [![Swift](https://img.shields.io/badge/Swift-5.7+-F05138?logo=swift&logoColor=white)](https://swift.org)
 [![Platforms](https://img.shields.io/badge/platforms-iOS%2014%2B%20%7C%20macOS%2011%2B-lightgrey?logo=apple&logoColor=white)](https://github.com/nsk-bci/mindwave-sdk-apple)
 [![SPM](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange)](https://github.com/nsk-bci/mindwave-sdk-apple)
