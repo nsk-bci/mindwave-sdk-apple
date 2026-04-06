@@ -1,14 +1,15 @@
 import Foundation
 
-/// NeuroSky ThinkGear BLE 패킷 파서
+/// NeuroSky ThinkGear BLE packet parser
 ///
-/// 0xEA — Attention/Meditation/PoorSignal
-/// 0xEB — EEG 주파수 파워 1/2 (Delta, Theta, LowAlpha, HighAlpha)
-/// 0xEC — EEG 주파수 파워 2/2 (LowBeta, HighBeta, LowGamma, MidGamma)
-/// RawEEG (039afff4) — 20바이트, 2바이트씩 10샘플
+/// 0xEA — Attention / Meditation / PoorSignal
+/// 0xEB — EEG frequency powers 1/2 (Delta, Theta, LowAlpha, HighAlpha)
+/// 0xEC — EEG frequency powers 2/2 (LowBeta, HighBeta, LowGamma, MidGamma)
+/// RawEEG (039afff4) — 20 bytes, 10 signed samples at 2 bytes each
 public final class ThinkGearParser {
 
-    // MARK: - 누적 상태 (패킷이 여러 번 나뉘어 들어올 수 있으므로)
+    // MARK: - Accumulated state
+    // Fields are updated incrementally as packets arrive from different characteristics.
 
     private var poorSignal: Int = 0
     private var attention: Int = 0
@@ -24,30 +25,24 @@ public final class ThinkGearParser {
 
     public init() {}
 
-    // MARK: - eSense 패킷 파싱 (0xEA / 0xEB / 0xEC)
+    // MARK: - eSense packet parsing (0xEA / 0xEB / 0xEC)
 
-    /// eSense characteristic (039afff8) 수신 데이터 파싱
-    /// - Returns: 업데이트된 BrainWaveData (poorSignal/attention/meditation 또는 EEG 파워 반영)
+    /// Parse data received from the eSense characteristic (039afff8).
+    /// - Returns: Updated `BrainWaveData` snapshot, or `nil` for unknown packet types.
     public func parseEsense(_ data: Data) -> BrainWaveData? {
         let bytes = [UInt8](data)
         guard !bytes.isEmpty else { return nil }
 
-        let packetType = bytes[0]
-
-        switch packetType {
-        case 0xEA:
-            return parseEA(bytes)
-        case 0xEB:
-            return parseEB(bytes)
-        case 0xEC:
-            return parseEC(bytes)
-        default:
-            return nil
+        switch bytes[0] {
+        case 0xEA: return parseEA(bytes)
+        case 0xEB: return parseEB(bytes)
+        case 0xEC: return parseEC(bytes)
+        default:   return nil
         }
     }
 
-    /// Raw EEG characteristic (039afff4) 수신 데이터 파싱
-    /// - Returns: rawEeg 필드가 채워진 BrainWaveData
+    /// Parse data received from the RawEEG characteristic (039afff4).
+    /// - Returns: `BrainWaveData` with the `rawEeg` field populated (10 signed int samples).
     public func parseRawEeg(_ data: Data) -> BrainWaveData {
         let bytes = [UInt8](data)
         var samples: [Int] = []
@@ -55,34 +50,33 @@ public final class ThinkGearParser {
         let count = bytes.count / 2
         for i in 0..<count {
             var value = (Int(bytes[i * 2]) << 8) | Int(bytes[i * 2 + 1])
-            if value > 32768 { value -= 65536 }
+            if value > 32768 { value -= 65536 }  // sign correction
             samples.append(value)
         }
 
         return makeSnapshot(rawEeg: samples)
     }
 
-    // MARK: - 핸드셰이크 패킷 생성
+    // MARK: - Handshake packet builder
 
-    /// 명령 바이트를 포함한 20바이트 핸드셰이크 패킷 생성
+    /// Build the 20-byte handshake packet for the given command byte.
     public static func buildHandshake(command: UInt8) -> Data {
         var bytes = [UInt8](repeating: 0x00, count: 20)
-        bytes[0] = 0x77  // 헤더
-        bytes[1] = 0x01  // 길이
+        bytes[0] = 0x77  // header
+        bytes[1] = 0x01  // length
         bytes[2] = command
 
-        // 체크섬: (bytes[1] + ... + bytes[18]) XOR 0xFF AND 0xFF
+        // Checksum: (bytes[1] + ... + bytes[18]) XOR 0xFF AND 0xFF
         let sum = bytes[1..<19].reduce(0, { $0 + Int($1) })
         bytes[19] = UInt8((sum ^ 0xFF) & 0xFF)
 
         return Data(bytes)
     }
 
-    // MARK: - BT Classic 전용
+    // MARK: - BT Classic helpers
 
-    /// BT Classic TLV에서 eSense 값 선택적 업데이트 후 스냅샷 반환
-    ///
-    /// nil인 파라미터는 이전 누적 값을 유지한다.
+    /// Selectively update eSense fields and return a snapshot.
+    /// Parameters that are `nil` retain their last accumulated value.
     public func updateAndSnapshot(poorSignal: Int? = nil, attention: Int? = nil, meditation: Int? = nil) -> BrainWaveData {
         if let v = poorSignal  { self.poorSignal  = v }
         if let v = attention   { self.attention   = v }
@@ -90,7 +84,7 @@ public final class ThinkGearParser {
         return makeSnapshot()
     }
 
-    /// BT Classic 0x83 EEG Power 파싱 (24바이트 = 8 × 3바이트 big-endian)
+    /// Parse a BT Classic 0x83 EEG Power TLV payload (24 bytes = 8 × 3-byte big-endian).
     public func parseEEGPowerBT(_ bytes: [UInt8]) -> BrainWaveData? {
         guard bytes.count >= 24 else { return nil }
         delta     = int24(bytes, offset: 0)
@@ -116,9 +110,9 @@ public final class ThinkGearParser {
 
     private func parseEB(_ bytes: [UInt8]) -> BrainWaveData? {
         guard bytes.count > 19 else { return nil }
-        delta    = int24(bytes, offset: 5)
-        theta    = int24(bytes, offset: 9)
-        lowAlpha = int24(bytes, offset: 13)
+        delta     = int24(bytes, offset: 5)
+        theta     = int24(bytes, offset: 9)
+        lowAlpha  = int24(bytes, offset: 13)
         highAlpha = int24(bytes, offset: 17)
         return makeSnapshot()
     }

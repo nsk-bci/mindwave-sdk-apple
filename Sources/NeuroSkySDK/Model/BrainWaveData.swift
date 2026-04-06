@@ -1,20 +1,20 @@
 import Foundation
 
-/// EEG 헤드셋에서 수신한 뇌파 데이터 스냅샷
+/// Snapshot of EEG data received from the headset
 public struct BrainWaveData: Sendable {
-    /// 데이터 수신 시각 (Unix milliseconds)
+    /// Timestamp of reception (Unix milliseconds)
     public let timestamp: Int64
 
-    /// 신호 품질 (0 = 완벽, 200 = 무신호)
+    /// Signal quality (0 = perfect contact, 200 = no signal)
     public let poorSignal: Int
 
-    /// 집중도 (0~100)
+    /// eSense attention level (0~100)
     public let attention: Int
 
-    /// 명상도 (0~100)
+    /// eSense meditation level (0~100)
     public let meditation: Int
 
-    // MARK: - EEG 주파수 파워 (0xEB / 0xEC 패킷)
+    // MARK: - EEG frequency band powers (0xEB / 0xEC packets)
 
     public let delta: Int       // 0.5~2.75 Hz
     public let theta: Int       // 3.5~6.75 Hz
@@ -25,10 +25,10 @@ public struct BrainWaveData: Sendable {
     public let lowGamma: Int    // 31~39.75 Hz
     public let midGamma: Int    // 41~49.75 Hz
 
-    /// Raw EEG 샘플 (패킷당 10개, 512 Hz)
+    /// Raw EEG samples (10 samples per packet, 512 Hz)
     public let rawEeg: [Int]
 
-    /// 눈 깜빡임 강도 (0이면 미감지)
+    /// Eye blink intensity (0 = not detected)
     public let eyeBlink: Int
 
     public init(
@@ -63,7 +63,7 @@ public struct BrainWaveData: Sendable {
         self.eyeBlink = eyeBlink
     }
 
-    /// 신호 품질 enum
+    /// Derived signal quality enum
     public var signalQuality: SignalQuality {
         switch poorSignal {
         case 200:       return .noSignal

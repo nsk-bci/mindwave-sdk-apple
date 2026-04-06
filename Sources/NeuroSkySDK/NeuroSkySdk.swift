@@ -1,8 +1,11 @@
 import Foundation
+import CoreBluetooth
 
-/// NeuroSky MindWave SDK 진입점
+/// Entry point for the NeuroSky MindWave Apple SDK.
 ///
-/// BLE 우선 연결, 5초 내 실패 시 macOS에서는 BT Classic으로 자동 폴백.
+/// BLE is used by default. Pass `mode: .btClassic` on macOS to connect via
+/// Bluetooth Classic SPP instead (requires the headset to be paired first in
+/// System Settings → Bluetooth).
 ///
 /// ```swift
 /// let sdk = NeuroSkySdk()
@@ -19,10 +22,10 @@ import Foundation
 @MainActor
 public final class NeuroSkySdk {
 
-    // MARK: - 공개 스트림
+    // MARK: - Public streams
     //
-    // SDK 소유의 단일 스트림을 노출한다.
-    // activeTransport가 교체되어도 구독자는 동일한 스트림을 유지한다.
+    // A single pair of streams is exposed by the SDK.
+    // Subscribers keep the same stream even if the active transport is swapped.
 
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
@@ -30,10 +33,11 @@ public final class NeuroSkySdk {
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
 
-    // MARK: - 내부 상태
+    // MARK: - Internal state
 
     private var activeTransport: (any Transport)?
     private var forwardTask: Task<Void, Never>?
+    private var deviceFinder: BLEDeviceFinder?
 
     private lazy var bleTransport = BLETransport()
 
@@ -43,7 +47,7 @@ public final class NeuroSkySdk {
 
     // MARK: - Init
 
-    /// 실기기 연결 초기화
+    /// Initialize for use with a real headset.
     public init() {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
@@ -53,7 +57,7 @@ public final class NeuroSkySdk {
         stateContinuation = stateCont
     }
 
-    /// Simulator 모드 초기화 (실기기 불필요)
+    /// Initialize in simulator mode — no real headset required.
     public init(simulator mode: SimulatorTransport.Mode = .random) {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
@@ -67,32 +71,35 @@ public final class NeuroSkySdk {
         startForwarding(from: sim)
     }
 
-    // MARK: - 연결
+    // MARK: - Connection
 
-    /// 디바이스 이름(또는 주소)으로 연결
+    /// Connect to the headset by device name or identifier string.
     ///
-    /// iOS: BLE 전용
-    /// macOS: BLE 우선 → 5초 내 실패 시 BT Classic 자동 폴백
-    public func connect(_ deviceAddress: String) async throws {
-        // Simulator 모드: 이미 설정된 SimulatorTransport를 직접 사용
+    /// - Parameters:
+    ///   - deviceAddress: The peripheral name (e.g. `"MindWave Mobile"`) or, for BLE,
+    ///     the `CBPeripheral.identifier` UUID string returned by `findDeviceIdentifier(_:timeout:)`.
+    ///   - mode: Transport to use. Defaults to `.ble` (iOS + macOS).
+    ///     Pass `.btClassic` on macOS to use Bluetooth Classic SPP.
+    public func connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws {
+        // Simulator mode: use the already-configured SimulatorTransport directly.
         if let sim = activeTransport as? SimulatorTransport {
             try await sim.connect(to: deviceAddress)
             return
         }
 
-        #if os(macOS)
-        do {
+        switch mode {
+        case .ble:
             try await connectBLE(deviceAddress)
-        } catch {
-            // BLE 실패(타임아웃 포함) → BT Classic 폴백
+        case .btClassic:
+            #if os(macOS)
             try await connectBTClassic(deviceAddress)
+            #else
+            throw TransportError.btClassicNotAvailableOniOS
+            #endif
         }
-        #else
-        try await connectBLE(deviceAddress)
-        #endif
     }
 
-    /// 연결 해제
+    /// Disconnect from the headset and release all resources.
     public func disconnect() async {
         forwardTask?.cancel()
         forwardTask = nil
@@ -100,12 +107,12 @@ public final class NeuroSkySdk {
         activeTransport = nil
     }
 
-    /// 헤드셋에 명령 전송
+    /// Send a raw command byte to the headset.
     public func sendCommand(_ command: UInt8) async throws {
         try await activeTransport?.sendCommand(command)
     }
 
-    // MARK: - 편의 메서드
+    // MARK: - Convenience commands
 
     public func startRawEeg() async throws {
         try await sendCommand(NeuroSkyCommand.startRawEeg)
@@ -115,29 +122,50 @@ public final class NeuroSkySdk {
         try await sendCommand(NeuroSkyCommand.stopRawEeg)
     }
 
-    /// 50Hz 노치 필터 (중국/유럽)
+    /// Apply 50 Hz notch filter (China / Europe mains frequency).
     public func setNotch50Hz() async throws {
         try await sendCommand(NeuroSkyCommand.notch50Hz)
     }
 
-    /// 60Hz 노치 필터 (한국/미국)
+    /// Apply 60 Hz notch filter (Korea / USA mains frequency).
     public func setNotch60Hz() async throws {
         try await sendCommand(NeuroSkyCommand.notch60Hz)
+    }
+
+    // MARK: - Device discovery
+
+    /// Scan for a BLE peripheral whose name contains `deviceName` and return
+    /// its `CBPeripheral.identifier` UUID string.
+    ///
+    /// The returned string can be passed directly to `connect(_:mode:)` as the
+    /// `deviceAddress` argument.  Cache the result to avoid scanning on every
+    /// app launch.
+    ///
+    /// - Parameters:
+    ///   - deviceName: Substring to match against the peripheral's advertised name
+    ///     (case-insensitive).
+    ///   - timeout: How long to scan before giving up. Default: 10 seconds.
+    /// - Returns: The peripheral's UUID string, or `nil` if none was found within
+    ///   the timeout.
+    public func findDeviceIdentifier(
+        _ deviceName: String,
+        timeout: TimeInterval = 10
+    ) async -> String? {
+        return await withCheckedContinuation { continuation in
+            let finder = BLEDeviceFinder(name: deviceName, timeout: timeout) { [weak self] uuid in
+                self?.deviceFinder = nil   // Release once done
+                continuation.resume(returning: uuid)
+            }
+            deviceFinder = finder  // Keep finder alive until the callback fires
+            finder.start()
+        }
     }
 
     // MARK: - Private
 
     private func connectBLE(_ deviceAddress: String) async throws {
         switchTransport(to: bleTransport)
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask { try await self.bleTransport.connect(to: deviceAddress) }
-            group.addTask {
-                try await Task.sleep(nanoseconds: 5_000_000_000)
-                throw TransportError.bleTimeout
-            }
-            try await group.next()
-            group.cancelAll()
-        }
+        try await bleTransport.connect(to: deviceAddress)
     }
 
     #if os(macOS)
@@ -147,14 +175,15 @@ public final class NeuroSkySdk {
     }
     #endif
 
-    /// activeTransport를 교체하고 스트림 포워딩을 재시작
+    /// Replace the active transport and restart stream forwarding.
     private func switchTransport(to transport: any Transport) {
         forwardTask?.cancel()
         activeTransport = transport
         startForwarding(from: transport)
     }
 
-    /// transport의 dataStream/stateStream을 SDK의 단일 스트림으로 포워딩
+    /// Forward dataStream and stateStream from the transport to the SDK's
+    /// single unified streams.
     private func startForwarding(from transport: any Transport) {
         let dataCont  = dataContinuation
         let stateCont = stateContinuation
@@ -177,8 +206,70 @@ public final class NeuroSkySdk {
     }
 }
 
-// MARK: - Error
+// MARK: - BLE device finder (internal helper)
+
+/// One-shot CBCentralManager that scans until a matching peripheral is found
+/// or the timeout expires.
+private final class BLEDeviceFinder: NSObject, CBCentralManagerDelegate {
+
+    private let targetName: String
+    private let timeout: TimeInterval
+    private let completion: (String?) -> Void
+
+    private var central: CBCentralManager?
+    private var timeoutTask: Task<Void, Never>?
+    private var finished = false
+
+    init(name: String, timeout: TimeInterval, completion: @escaping (String?) -> Void) {
+        self.targetName = name
+        self.timeout    = timeout
+        self.completion = completion
+        super.init()
+    }
+
+    func start() {
+        central = CBCentralManager(delegate: self, queue: .main)
+    }
+
+    // MARK: CBCentralManagerDelegate
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        guard central.state == .poweredOn else {
+            finish(with: nil)
+            return
+        }
+        central.scanForPeripherals(withServices: nil, options: nil)
+        timeoutTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            self.finish(with: nil)
+        }
+    }
+
+    func centralManager(
+        _ central: CBCentralManager,
+        didDiscover peripheral: CBPeripheral,
+        advertisementData: [String: Any],
+        rssi RSSI: NSNumber
+    ) {
+        let name = peripheral.name ?? ""
+        guard name.lowercased().contains(targetName.lowercased()) else { return }
+        finish(with: peripheral.identifier.uuidString)
+    }
+
+    private func finish(with result: String?) {
+        guard !finished else { return }
+        finished = true
+        timeoutTask?.cancel()
+        central?.stopScan()
+        central = nil
+        completion(result)
+    }
+}
+
+// MARK: - Errors
 
 public enum TransportError: Error {
-    case bleTimeout
+    /// BT Classic transport is only available on macOS.
+    case btClassicNotAvailableOniOS
 }

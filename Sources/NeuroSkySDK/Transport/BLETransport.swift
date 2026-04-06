@@ -1,17 +1,17 @@
 import Foundation
 import CoreBluetooth
 
-/// CoreBluetooth 기반 BLE Transport (iOS 14+ / macOS 11+)
+/// CoreBluetooth-based BLE transport (iOS 14+ / macOS 11+)
 ///
-/// 연결 흐름:
-/// 1. CBCentralManager 초기화
-/// 2. "MindWave Mobile" 이름으로 스캔
+/// Connection flow:
+/// 1. CBCentralManager initialization
+/// 2. Scan for peripheral with matching name or UUID
 /// 3. connectPeripheral → discoverServices
-/// 4. ESENSE + RAW_EEG characteristic notification 활성화
-/// 5. Handshake(START_ESENSE) 전송 → connect() resume
+/// 4. Enable NOTIFY on eSense + RawEEG characteristics
+/// 5. Send Handshake(START_ESENSE) → resume connect()
 public final class BLETransport: NSObject, Transport {
 
-    // MARK: - AsyncStream 출력
+    // MARK: - AsyncStream output
 
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
@@ -19,9 +19,8 @@ public final class BLETransport: NSObject, Transport {
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
 
-    // MARK: - 내부 상태
+    // MARK: - Internal state
 
-    // BLETransport 내부에서만 사용하는 CBUUID 인스턴스
     private let esenseUUID    = CBUUID(string: NeuroSkyUUID.esense)
     private let handshakeUUID = CBUUID(string: NeuroSkyUUID.handshake)
     private let rawEegUUID    = CBUUID(string: NeuroSkyUUID.rawEeg)
@@ -31,10 +30,11 @@ public final class BLETransport: NSObject, Transport {
     private var handshakeChar: CBCharacteristic?
     private var targetAddress: String = ""
 
-    /// connect() 호출자를 실제 BLE 연결 완료까지 대기시키는 continuation
+    /// Suspends the connect() caller until BLE connection is fully established.
     private var connectContinuation: CheckedContinuation<Void, Error>?
 
-    /// esense + rawEeg 두 notification이 모두 활성화됐는지 추적
+    /// Tracks which characteristics have had notifications enabled.
+    /// Both eSense and RawEEG must be notifying before the connection is considered complete.
     private var notifiedCharacteristics: Set<String> = []
 
     private let parser = ThinkGearParser()
@@ -57,7 +57,7 @@ public final class BLETransport: NSObject, Transport {
 
     // MARK: - Transport
 
-    /// 실제 BLE 연결 완료(handshake 전송 완료)까지 suspend
+    /// Suspend until BLE connection is fully established (handshake sent).
     public func connect(to deviceAddress: String) async throws {
         targetAddress = deviceAddress
         notifiedCharacteristics.removeAll()
@@ -71,7 +71,7 @@ public final class BLETransport: NSObject, Transport {
 
     public func disconnect() async {
         central.stopScan()
-        // connect() 대기 중이면 에러로 resume (미반환 시 영구 hang)
+        // Resume any pending connect() with an error to prevent a hang
         connectContinuation?.resume(throwing: CancellationError())
         connectContinuation = nil
         if let p = peripheral {
@@ -91,10 +91,10 @@ public final class BLETransport: NSObject, Transport {
 
     private func setupNotification(for characteristic: CBCharacteristic, peripheral p: CBPeripheral) {
         p.setNotifyValue(true, for: characteristic)
-        // setNotifyValue가 CCCD 디스크립터를 자동으로 write함
+        // setNotifyValue writes the CCCD descriptor automatically
     }
 
-    /// esense + rawEeg 둘 다 notification 활성화된 후 연결 완료 처리
+    /// Resume connect() once both eSense and RawEEG notifications are active.
     private func resumeIfFullyConnected() {
         let required: Set<String> = [
             esenseUUID.uuidString,
@@ -106,7 +106,6 @@ public final class BLETransport: NSObject, Transport {
         stateContinuation.yield(.connected)
         Task { try? await sendCommand(NeuroSkyCommand.startEsense) }
 
-        // connect() 호출자 resume
         connectContinuation?.resume()
         connectContinuation = nil
     }

@@ -54,7 +54,7 @@ import NeuroSkySDK
 let sdk = NeuroSkySdk()
 
 Task {
-    // BLE first; macOS auto-falls back to BT Classic after 5 sec
+    // BLE (default) — works on iOS and macOS without pairing
     try await sdk.connect("MindWave Mobile")
 
     // Set notch filter for your region (removes power-line noise)
@@ -71,7 +71,8 @@ Task {
 
 That's it — three steps from zero to streaming EEG data.
 
-> **Need more detail?** See the full [Developer Guide](docs/developer-guide.pdf) for architecture, all connection modes, signal quality handling, advanced patterns, and the complete API reference.
+> [!TIP]
+> The full [Developer Guide (PDF)](docs/developer-guide.pdf) covers architecture, all connection modes, packet timing, signal quality handling, advanced patterns, and the complete API reference.
 
 ---
 
@@ -88,11 +89,82 @@ That's it — three steps from zero to streaming EEG data.
 
 ## Connection Modes
 
-| Mode | Behavior | Pairing required? |
+| Mode | API call | Platforms | Pairing required? |
+|---|---|---|---|
+| BLE (default) | `sdk.connect("MindWave Mobile")` | iOS + macOS | No |
+| BT Classic | `sdk.connect("MindWave Mobile", mode: .btClassic)` | macOS only | Yes |
+
+## Finding Your Device Identifier
+
+CoreBluetooth does not expose MAC addresses. Use `findDeviceIdentifier` to
+discover the OS-assigned UUID, then cache it for subsequent launches:
+
+```swift
+// First launch — scan and cache
+if let uuid = await sdk.findDeviceIdentifier("MindWave Mobile") {
+    UserDefaults.standard.set(uuid, forKey: "mindwave_uuid")
+    try await sdk.connect(uuid)
+}
+
+// Subsequent launches — connect directly (much faster)
+if let uuid = UserDefaults.standard.string(forKey: "mindwave_uuid") {
+    try await sdk.connect(uuid)
+}
+```
+
+## Working with dataStream
+
+### Packet timing
+
+| Source | Characteristic | Typical rate |
 |---|---|---|
-| Auto (default) | BLE first; auto-falls back to BT Classic after 5 sec (macOS only) | No |
-| BLE only | iOS and macOS — fastest, no pairing needed | No |
-| BT Classic only | macOS only — more stable in noisy RF environments | Yes |
+| eSense (attention, meditation, EEG bands) | `039afff8` | ~1 Hz |
+| Raw EEG samples | `039afff4` | ~51 Hz (10 samples/packet × 512 Hz) |
+
+Both characteristics share the same `dataStream`. When both are active, the
+stream delivers a mix of packets at their respective rates.
+
+### Common pitfall — filtering by `attention == 0`
+
+```swift
+// WRONG — silently drops every RawEEG packet (attention is always 0 in those)
+for await data in sdk.dataStream {
+    guard data.attention > 0 else { continue }  // ← drops ~98% of packets
+    processRawEeg(data.rawEeg)
+}
+
+// CORRECT — check the field you actually care about
+for await data in sdk.dataStream {
+    if !data.rawEeg.isEmpty {
+        processRawEeg(data.rawEeg)         // Raw EEG packet
+    }
+    if data.attention > 0 || data.meditation > 0 {
+        updateUI(data)                     // eSense packet
+    }
+}
+```
+
+### Receiving only eSense data
+
+```swift
+try await sdk.connect("MindWave Mobile")  // startEsense sent automatically
+
+for await data in sdk.dataStream where data.rawEeg.isEmpty {
+    print("Attention: \(data.attention), Meditation: \(data.meditation)")
+}
+```
+
+### Receiving only Raw EEG
+
+```swift
+try await sdk.connect("MindWave Mobile")
+try await sdk.startRawEeg()
+
+for await data in sdk.dataStream where !data.rawEeg.isEmpty {
+    let samples = data.rawEeg  // 10 signed Int samples, 512 Hz
+    processDSP(samples)
+}
+```
 
 ## Simulator (without a real device)
 
@@ -157,14 +229,14 @@ try await sdk.stopRawEeg()
 
 ```
 Sources/NeuroSkySDK/
-├── NeuroSkySdk.swift            Entry point (BLE first + BT Classic fallback)
+├── NeuroSkySdk.swift            Entry point (@MainActor, TransportMode selection)
 ├── NeuroSkyUUID.swift           UUID and command constants
 ├── Model/
 │   └── BrainWaveData.swift      EEG data model
 ├── Parser/
 │   └── ThinkGearParser.swift    ThinkGear packet parser
 ├── Transport/
-│   ├── Transport.swift          Common protocol, ConnectionState enum
+│   ├── Transport.swift          Common protocol, ConnectionState, TransportMode
 │   ├── BLETransport.swift       CoreBluetooth implementation (iOS + macOS)
 │   └── BTClassicTransport.swift IOBluetooth implementation (macOS only)
 └── Simulator/
@@ -173,14 +245,7 @@ Sources/NeuroSkySDK/
 
 ## Changelog
 
-### v1.0.0
-- CoreBluetooth BLE GATT implementation (iOS 14+ / macOS 11+)
-- IOBluetooth BT Classic RFCOMM SPP implementation (macOS only)
-- Auto-fallback: BLE → BT Classic (macOS, 5 sec timeout)
-- `AsyncStream<BrainWaveData>` stream API — native Swift concurrency
-- Simulator modes: `.random` / `.focused` / `.relaxed` / `.poorSignal`
-- Swift 5.7, SPM distribution
-- GitHub Actions CI: macOS build + test, iOS Simulator build
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
 ## License
 

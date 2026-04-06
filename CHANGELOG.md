@@ -1,14 +1,22 @@
 # Changelog
 
-## [2.0.0] — 2026-04-02
+## [1.0.0] — 2026-04-06
 
-### 추가
-- Swift Package Manager 지원 (iOS 14+, macOS 11+)
-- CoreBluetooth 기반 BLETransport (iOS + macOS 공용)
-- IOBluetooth 기반 BTClassicTransport (macOS 전용)
-- BLE 5초 타임아웃 → BT Classic 자동 폴백 (macOS)
-- SimulatorTransport: RANDOM / FOCUSED / RELAXED / POOR_SIGNAL 모드
-- ThinkGearParser: 0xEA/0xEB/0xEC 패킷, Raw EEG 부호처리, 핸드셰이크 생성
-- AsyncStream 기반 dataStream / stateStream API
-- `@MainActor` 적용으로 UI 업데이트 안전성 보장
+### Added
+- Swift Package Manager distribution (iOS 14+, macOS 11+)
+- `BLETransport` — CoreBluetooth GATT implementation (iOS + macOS)
+- `BTClassicTransport` — IOBluetooth RFCOMM SPP implementation (macOS only)
+- `TransportMode` enum — explicit `.ble` (default) / `.btClassic` selection
+- `findDeviceIdentifier(_:timeout:)` — scan for BLE peripheral by name, returns
+  the OS-assigned `CBPeripheral.identifier` UUID string
+- `SimulatorTransport` — synthetic data without a real headset;
+  modes: `.random` / `.focused` / `.relaxed` / `.poorSignal`
+- `ThinkGearParser` — decodes 0xEA / 0xEB / 0xEC eSense packets, Raw EEG
+  sign-extension, and 20-byte handshake packet builder
+- `AsyncStream<BrainWaveData>` data stream + `AsyncStream<ConnectionState>` state stream
+- `@MainActor` on `NeuroSkySdk` for safe UI updates from async tasks
+- `setNotch50Hz()` / `setNotch60Hz()` convenience commands
+- `startRawEeg()` / `stopRawEeg()` convenience commands
 
+### Removed
+- Auto-fallback from BLE to BT Classic — use `mode: .btClassic` explicitly instead

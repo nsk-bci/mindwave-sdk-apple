@@ -1,6 +1,6 @@
 import Foundation
 
-/// 연결 상태
+/// Connection state
 public enum ConnectionState: Sendable {
     case disconnected
     case scanning
@@ -24,20 +24,28 @@ extension ConnectionState: Equatable {
     }
 }
 
-/// BLE / BT Classic 공통 Transport 프로토콜
+/// Selects which Bluetooth transport to use.
+public enum TransportMode {
+    /// BLE via CoreBluetooth. No pairing required. Default. iOS + macOS.
+    case ble
+    /// BT Classic via IOBluetooth RFCOMM SPP. macOS only. Requires pairing in System Settings.
+    case btClassic
+}
+
+/// Common protocol shared by BLETransport, BTClassicTransport, and SimulatorTransport.
 public protocol Transport: AnyObject {
-    /// 수신된 BrainWaveData 스트림
+    /// Received BrainWaveData stream
     var dataStream: AsyncStream<BrainWaveData> { get }
 
-    /// 연결 상태 스트림
+    /// Connection state stream
     var stateStream: AsyncStream<ConnectionState> { get }
 
-    /// 디바이스 주소(또는 이름)로 연결
+    /// Connect to a device by address or name
     func connect(to deviceAddress: String) async throws
 
-    /// 연결 해제
+    /// Disconnect
     func disconnect() async
 
-    /// 헤드셋에 명령 전송
+    /// Send a command byte to the headset
     func sendCommand(_ command: UInt8) async throws
 }

@@ -1,25 +1,25 @@
 import Foundation
 
-/// 실기기 없이 개발할 때 사용하는 Simulator Transport
+/// Simulator transport for development without a real headset.
 ///
-/// 1초마다 BrainWaveData를 자동 생성한다.
-/// Debug 빌드에서만 사용 권장 (#if DEBUG).
+/// Emits synthetic `BrainWaveData` once per second.
+/// Recommended for use in `#if DEBUG` blocks only.
 public final class SimulatorTransport: Transport {
 
-    // MARK: - 시뮬레이터 모드
+    // MARK: - Simulator modes
 
     public enum Mode {
-        /// 랜덤 값
+        /// Random attention and meditation values
         case random
-        /// 집중 상태: attention 높음, meditation 중간
+        /// High attention, moderate meditation — focused state
         case focused
-        /// 이완 상태: attention 낮음, meditation 높음
+        /// Low attention, high meditation — relaxed state
         case relaxed
-        /// 신호 불량: poorSignal = 200
+        /// poorSignal = 200 — no signal / error handling test
         case poorSignal
     }
 
-    // MARK: - AsyncStream 출력
+    // MARK: - AsyncStream output
 
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
@@ -27,7 +27,7 @@ public final class SimulatorTransport: Transport {
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
 
-    // MARK: - 상태
+    // MARK: - State
 
     private var mode: Mode
     private var timerTask: Task<Void, Never>?
@@ -55,7 +55,7 @@ public final class SimulatorTransport: Transport {
 
     public func connect(to deviceAddress: String) async throws {
         stateContinuation.yield(.connecting)
-        try await Task.sleep(nanoseconds: 300_000_000)  // 0.3초 가짜 연결 지연
+        try await Task.sleep(nanoseconds: 300_000_000)  // 0.3 s simulated delay
         stateContinuation.yield(.connected)
         startEmitting()
     }
@@ -67,7 +67,7 @@ public final class SimulatorTransport: Transport {
     }
 
     public func sendCommand(_ command: UInt8) async throws {
-        // 시뮬레이터는 명령 무시
+        // Simulator ignores all commands
     }
 
     // MARK: - Private
@@ -75,7 +75,7 @@ public final class SimulatorTransport: Transport {
     private func startEmitting() {
         timerTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1초
+                try? await Task.sleep(nanoseconds: 1_000_000_000)  // 1 s
                 guard !Task.isCancelled else { break }
                 dataContinuation.yield(generateData())
             }

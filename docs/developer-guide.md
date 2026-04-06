@@ -21,7 +21,7 @@ title: NeuroSky MindWave Mobile Apple SDK — Developer Guide
 10. [Commands](#10-commands)
 11. [Simulator — Develop Without Hardware](#11-simulator--develop-without-hardware)
 12. [Error Handling & Reconnection](#12-error-handling--reconnection)
-13. [Advanced Patterns](#13-advanced-patterns)
+13. [Advanced Patterns](#13-advanced-patterns) — device finder, dataStream timing, Combine, Raw EEG
 14. [Troubleshooting](#14-troubleshooting)
 15. [Testing](#15-testing)
 16. [API Reference](#16-api-reference)
@@ -36,7 +36,7 @@ The **NeuroSky MindWave Mobile Apple SDK** is a modern Swift library that lets y
 
 | Feature | Description |
 |---|---|
-| BLE + BT Classic | iOS: BLE. macOS: BLE with automatic BT Classic fallback |
+| BLE + BT Classic | iOS: BLE. macOS: BLE (default) or BT Classic via `mode: .btClassic` |
 | Swift Concurrency | `AsyncStream<BrainWaveData>` — integrates naturally with SwiftUI `.task {}` |
 | Built-in Simulator | Full data simulation without any hardware |
 | SPM distribution | One-line Package.swift dependency |
@@ -108,9 +108,20 @@ The MindWave Mobile emulates a serial port (SPP UUID `00001101-...`). The SDK op
 
 Both paths produce identical `BrainWaveData` output through the same `dataStream`.
 
-### Auto-fallback strategy
+### Transport selection
 
-`NeuroSkySdk.connect()` always tries BLE first. On macOS, if BLE does not reach `connected` within 5 seconds, it automatically disconnects BLE and retries with BT Classic. Your `dataStream` collection code is unchanged — the transport switch is transparent. On iOS, only BLE is used.
+`NeuroSkySdk.connect(_:mode:)` accepts an explicit `TransportMode`:
+
+```swift
+// BLE — default, works on iOS + macOS, no pairing required
+try await sdk.connect("MindWave Mobile")                          // mode: .ble
+try await sdk.connect("MindWave Mobile", mode: .ble)
+
+// BT Classic — macOS only, headset must be paired in System Settings first
+try await sdk.connect("MindWave Mobile", mode: .btClassic)
+```
+
+Both modes produce identical `BrainWaveData` through the same `dataStream`. On iOS, passing `mode: .btClassic` throws `TransportError.btClassicNotAvailableOniOS`.
 
 ---
 
@@ -468,10 +479,8 @@ Task {
         showAlert("Connection failed — is the headset on and nearby?")
     } catch BTError.deviceNotFound {
         showAlert("Device not found — pair it in macOS Bluetooth settings first")
-    } catch TransportError.bleTimeout {
-        // On macOS this is handled internally — SDK retries with BT Classic
-        // This error only surfaces if BT Classic also fails
-        showAlert("Could not connect via BLE or BT Classic")
+    } catch TransportError.btClassicNotAvailableOniOS {
+        showAlert("BT Classic is only supported on macOS — use BLE instead")
     } catch {
         showAlert("Unexpected error: \(error)")
     }
@@ -523,6 +532,81 @@ Task {
 ---
 
 ## 13. Advanced Patterns
+
+### Finding a device by name — `findDeviceIdentifier`
+
+CoreBluetooth identifies peripherals by an OS-assigned UUID, not by MAC address.
+Use `findDeviceIdentifier` to discover this UUID once, cache it, and use it for
+faster subsequent connections:
+
+```swift
+// First launch — scan and save
+if let uuid = await sdk.findDeviceIdentifier("MindWave Mobile", timeout: 10) {
+    UserDefaults.standard.set(uuid, forKey: "mindwave_uuid")
+    try await sdk.connect(uuid)
+}
+
+// Subsequent launches — connect directly (no scan needed)
+if let uuid = UserDefaults.standard.string(forKey: "mindwave_uuid") {
+    try await sdk.connect(uuid)
+} else {
+    // UUID not cached yet — fall back to name-based scan
+    try await sdk.connect("MindWave Mobile")
+}
+```
+
+### Working with dataStream — packet timing and common pitfalls
+
+Both the eSense and RawEEG characteristics share the same `dataStream`. They
+arrive at very different rates:
+
+| Source | Characteristic | Typical rate |
+|---|---|---|
+| eSense (attention, meditation, EEG bands) | `039afff8` | ~1 Hz |
+| Raw EEG samples | `039afff4` | ~51 Hz (10 samples/packet × 512 Hz) |
+
+**Do not filter by `attention == 0`** — this silently drops all RawEEG packets
+because `attention` is always 0 in those packets:
+
+```swift
+// WRONG — drops ~98% of packets when RawEEG is enabled
+for await data in sdk.dataStream {
+    guard data.attention > 0 else { continue }
+    processRawEeg(data.rawEeg)  // ← never reached
+}
+
+// CORRECT — branch on the field you actually need
+for await data in sdk.dataStream {
+    if !data.rawEeg.isEmpty {
+        processRawEeg(data.rawEeg)                         // RawEEG packet
+    }
+    if data.attention > 0 || data.meditation > 0 {
+        updateUI(data)                                     // eSense packet
+    }
+}
+```
+
+**eSense only (without Raw EEG):**
+
+```swift
+try await sdk.connect("MindWave Mobile")  // startEsense is sent automatically
+
+for await data in sdk.dataStream where data.rawEeg.isEmpty {
+    print("Attention: \(data.attention), Meditation: \(data.meditation)")
+}
+```
+
+**Raw EEG only:**
+
+```swift
+try await sdk.connect("MindWave Mobile")
+try await sdk.startRawEeg()
+
+for await data in sdk.dataStream where !data.rawEeg.isEmpty {
+    let samples = data.rawEeg  // 10 signed Int samples per packet, 512 Hz
+    processDSP(samples)
+}
+```
 
 ### Combine integration
 
@@ -605,7 +689,7 @@ for await data in sdk.dataStream {
 - The device may already be connected to another host — power cycle the headset
 - Try moving within 1 meter of the headset
 - Disable and re-enable Bluetooth in macOS System Settings
-- If the issue persists, the SDK will automatically fall back to BT Classic (macOS only)
+- If the issue persists, try BT Classic on macOS: `sdk.connect("MindWave Mobile", mode: .btClassic)`
 
 ### BT Classic "device not found" on macOS
 
@@ -701,8 +785,12 @@ public final class NeuroSkySdk {
 
     /// Connect to headset by name or address
     /// - iOS: BLE only
-    /// - macOS: BLE first, auto-falls back to BT Classic after 5 sec
-    public func connect(_ deviceAddress: String) async throws
+    /// - mode: Transport to use. Defaults to `.ble`. Pass `.btClassic` on macOS for SPP.
+    public func connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws
+
+    /// Scan for a BLE peripheral by name and return its OS-assigned UUID string.
+    /// Cache the result to skip scanning on subsequent launches.
+    public func findDeviceIdentifier(_ deviceName: String, timeout: TimeInterval = 10) async -> String?
 
     /// Disconnect from headset
     public func disconnect() async
@@ -789,17 +877,26 @@ public enum NeuroSkyCommand {
 
 ```swift
 public enum BLEError: Error {
-    case bluetoothUnavailable   // Bluetooth is off or restricted
-    case connectionFailed       // GATT connection failed
-    case deviceNotFound         // No matching peripheral found during scan
+    case bluetoothUnavailable           // Bluetooth is off or restricted
+    case connectionFailed               // GATT connection failed
+    case deviceNotFound                 // No matching peripheral found during scan
 }
 
 public enum BTError: Error {
-    case deviceNotFound         // Not found in paired device list (macOS)
-    case connectionFailed       // RFCOMM channel failed to open
+    case deviceNotFound                 // Not found in paired device list (macOS)
+    case connectionFailed               // RFCOMM channel failed to open
 }
 
 public enum TransportError: Error {
-    case bleTimeout             // BLE did not connect within 5 sec (macOS: retries BT Classic)
+    case btClassicNotAvailableOniOS     // .btClassic mode is macOS only
+}
+```
+
+### `TransportMode`
+
+```swift
+public enum TransportMode {
+    case ble        // CoreBluetooth GATT — iOS + macOS, no pairing required (default)
+    case btClassic  // IOBluetooth RFCOMM SPP — macOS only, requires pairing
 }
 ```

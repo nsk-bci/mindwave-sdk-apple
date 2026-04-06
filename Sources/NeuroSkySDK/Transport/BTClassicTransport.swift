@@ -2,16 +2,16 @@
 import Foundation
 import IOBluetooth
 
-/// IOBluetooth 기반 BT Classic SPP Transport (macOS 전용)
+/// IOBluetooth-based BT Classic SPP transport (macOS only)
 ///
-/// 연결 흐름:
-/// 1. IOBluetoothDevice 조회 (주소 또는 페어링 목록)
-/// 2. openRFCOMMChannelSync → 채널 획득
-/// 3. InputStream에서 바이트 읽기 → ThinkGearParser
-/// 4. BrainWaveData emit
+/// Connection flow:
+/// 1. Look up the device in the paired devices list by name or address
+/// 2. openRFCOMMChannelSync → acquire channel
+/// 3. Read bytes from the delegate callback → ThinkGearParser
+/// 4. Emit BrainWaveData
 public final class BTClassicTransport: NSObject, Transport {
 
-    // MARK: - AsyncStream 출력
+    // MARK: - AsyncStream output
 
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
@@ -19,7 +19,7 @@ public final class BTClassicTransport: NSObject, Transport {
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
 
-    // MARK: - 내부 상태
+    // MARK: - Internal state
 
     private var device: IOBluetoothDevice?
     private var rfcommChannel: IOBluetoothRFCOMMChannel?
@@ -46,7 +46,7 @@ public final class BTClassicTransport: NSObject, Transport {
     public func connect(to deviceAddress: String) async throws {
         stateContinuation.yield(.connecting)
 
-        // 페어링된 디바이스 목록에서 이름 또는 주소로 검색
+        // Search paired devices by name or address
         let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
         let found = paired.first {
             $0.name?.lowercased().contains(deviceAddress.lowercased()) == true ||
@@ -104,7 +104,7 @@ extension BTClassicTransport: IOBluetoothRFCOMMChannelDelegate {
         let incoming = Data(bytes: ptr, count: dataLength)
         readBuffer.append(incoming)
 
-        // ThinkGear BT Classic 스트림: 0xAA 0xAA 동기 헤더 기반 패킷 분리
+        // BT Classic stream is continuous bytes — find packet boundaries via 0xAA 0xAA sync header
         processBuffer()
     }
 
@@ -112,9 +112,8 @@ extension BTClassicTransport: IOBluetoothRFCOMMChannelDelegate {
         stateContinuation.yield(.disconnected)
     }
 
-    // MARK: - 버퍼 처리
+    // MARK: - Buffer processing
 
-    /// BT Classic 스트림은 연속 바이트이므로 ThinkGear 동기 헤더(0xAA 0xAA)로 패킷 경계 탐색
     private func processBuffer() {
         let bytes = [UInt8](readBuffer)
         var i = 0
@@ -123,18 +122,17 @@ extension BTClassicTransport: IOBluetoothRFCOMMChannelDelegate {
             guard bytes[i] == 0xAA, bytes[i + 1] == 0xAA else { i += 1; continue }
 
             let payloadLen = Int(bytes[i + 2])
-            let packetEnd  = i + 3 + payloadLen + 1  // +1 checksum
+            let packetEnd  = i + 3 + payloadLen + 1  // +1 for checksum byte
 
             guard packetEnd <= bytes.count else { break }
 
             let payload  = Array(bytes[(i + 3)..<(i + 3 + payloadLen)])
             let checksum = bytes[packetEnd - 1]
 
-            // 체크섬 검증
+            // Validate checksum
             let computed = UInt8(payload.reduce(0, { ($0 + Int($1)) & 0xFF }) ^ 0xFF)
             guard computed == checksum else { i += 1; continue }
 
-            // eSense 패킷 타입 판별 후 파싱
             parseBTPayload(payload)
 
             i = packetEnd
@@ -153,37 +151,37 @@ extension BTClassicTransport: IOBluetoothRFCOMMChannelDelegate {
             let code = payload[j]; j += 1
 
             switch code {
-            case 0x02:  // PoorSignal (1바이트)
+            case 0x02:  // PoorSignal (1 byte)
                 guard j < payload.count else { return }
                 poorSig = Int(payload[j]); j += 1
 
-            case 0x04:  // Attention (1바이트)
+            case 0x04:  // Attention (1 byte)
                 guard j < payload.count else { return }
                 att = Int(payload[j]); j += 1
 
-            case 0x05:  // Meditation (1바이트)
+            case 0x05:  // Meditation (1 byte)
                 guard j < payload.count else { return }
                 med = Int(payload[j]); j += 1
 
-            case 0x80:  // Raw EEG (2바이트)
+            case 0x80:  // Raw EEG (2 bytes)
                 guard j + 1 < payload.count else { return }
                 let raw = Data([payload[j], payload[j + 1]]); j += 2
                 dataContinuation.yield(parser.parseRawEeg(raw))
 
-            case 0x83:  // EEG Power (24바이트 = 8 × 3바이트 big-endian)
+            case 0x83:  // EEG Power (24 bytes = 8 × 3-byte big-endian)
                 guard j + 23 < payload.count else { return }
                 let eegBytes = Array(payload[j..<(j + 24)]); j += 24
                 if let data = parser.parseEEGPowerBT(eegBytes) {
                     dataContinuation.yield(data)
                 }
 
-            default:    // 알 수 없는 코드 → 길이 바이트로 스킵
+            default:    // Unknown code — skip using length byte
                 guard j < payload.count else { return }
                 let len = Int(payload[j]); j += 1 + len
             }
         }
 
-        // eSense 값이 하나라도 수신됐으면 누적 상태에 반영 후 emit
+        // Emit accumulated eSense fields if any were received in this packet
         if poorSig != nil || att != nil || med != nil {
             dataContinuation.yield(
                 parser.updateAndSnapshot(poorSignal: poorSig, attention: att, meditation: med)

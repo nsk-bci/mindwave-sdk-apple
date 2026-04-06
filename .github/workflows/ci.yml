@@ -17,7 +17,7 @@ jobs:
       - name: Swift version
         run: swift --version
 
-      # macOS: swift build + swift test (CoreBluetooth + IOBluetooth 포함)
+      # macOS: build + test (CoreBluetooth + IOBluetooth available)
       - name: Build (macOS)
         run: swift build -v
 
@@ -31,11 +31,11 @@ jobs:
         run: swift test -v --filter SimulatorIntegrationTests 2>&1
         continue-on-error: true
 
-      # iOS: xcodebuild로 컴파일 검증 (실행은 시뮬레이터 필요 없음)
+      # iOS: compile-check against the iOS Simulator SDK using swift build
       - name: Build (iOS Simulator)
         run: |
-          xcodebuild build \
-            -scheme NeuroSkySDK \
-            -destination "generic/platform=iOS Simulator" \
-            CODE_SIGNING_ALLOWED=NO \
-            SKIP_INSTALL=YES
+          swift build \
+            -Xswiftc "-sdk" \
+            -Xswiftc "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            -Xswiftc "-target" \
+            -Xswiftc "arm64-apple-ios14.0-simulator"
