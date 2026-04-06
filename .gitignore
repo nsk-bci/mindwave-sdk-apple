@@ -6,3 +6,4 @@ xcuserdata/
 .swiftpm/
 docs/node_modules/
 docs/package-lock.json
+packages.json

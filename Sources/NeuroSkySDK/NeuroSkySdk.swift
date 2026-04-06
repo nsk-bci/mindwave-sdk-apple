@@ -105,6 +105,10 @@ public final class NeuroSkySdk {
         forwardTask = nil
         await activeTransport?.disconnect()
         activeTransport = nil
+        // Guarantee .disconnected is always emitted on sdk.stateStream.
+        // forwardTask is already cancelled so it cannot forward the transport's
+        // .disconnected event — emit it directly here instead.
+        stateContinuation.yield(.disconnected)
     }
 
     /// Send a raw command byte to the headset.

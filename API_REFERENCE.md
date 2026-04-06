@@ -4,60 +4,95 @@
 
 ## NeuroSkySdk
 
-메인 진입점. `@MainActor` 클래스.
+Main entry point. `@MainActor` class.
 
-### 초기화
+### Initializers
 
 ```swift
-// 실기기 연결
+// Connect to a real headset
 init()
 
-// Simulator 모드
-init(simulator mode: SimulatorTransport.Mode)
+// Simulator mode — no headset required
+init(simulator mode: SimulatorTransport.Mode = .random)
 ```
 
-### 프로퍼티
+### Properties
 
-| 프로퍼티 | 타입 | 설명 |
-|---------|------|------|
-| `dataStream` | `AsyncStream<BrainWaveData>` | EEG 데이터 스트림 |
-| `stateStream` | `AsyncStream<ConnectionState>` | 연결 상태 스트림 |
+| Property | Type | Description |
+|----------|------|-------------|
+| `dataStream` | `AsyncStream<BrainWaveData>` | EEG data stream |
+| `stateStream` | `AsyncStream<ConnectionState>` | Connection state stream |
 
-### 메서드
+### Methods
 
-| 메서드 | 설명 |
-|--------|------|
-| `connect(_ deviceAddress: String) async throws` | 이름 또는 UUID로 연결 |
-| `disconnect() async` | 연결 해제 |
-| `sendCommand(_ command: UInt8) async throws` | 헤드셋에 명령 전송 |
-| `startRawEeg() async throws` | Raw EEG 수신 시작 |
-| `stopRawEeg() async throws` | Raw EEG 수신 중지 |
-| `setNotch50Hz() async throws` | 50Hz 노치 필터 (중국/유럽) |
-| `setNotch60Hz() async throws` | 60Hz 노치 필터 (한국/미국) |
+| Method | Description |
+|--------|-------------|
+| `connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws` | Connect by peripheral name or UUID string |
+| `disconnect() async` | Disconnect and release all resources |
+| `findDeviceIdentifier(_ deviceName: String, timeout: TimeInterval = 10) async -> String?` | Scan for a BLE peripheral by name, returns its UUID string |
+| `sendCommand(_ command: UInt8) async throws` | Send a raw command byte to the headset |
+| `startRawEeg() async throws` | Start Raw EEG streaming |
+| `stopRawEeg() async throws` | Stop Raw EEG streaming |
+| `setNotch50Hz() async throws` | Apply 50 Hz notch filter (China / Europe) |
+| `setNotch60Hz() async throws` | Apply 60 Hz notch filter (Korea / USA) |
+
+#### `connect(_:mode:)`
+
+```swift
+try await sdk.connect("MindWave Mobile")               // BLE by name (default)
+try await sdk.connect(savedUUID)                        // BLE by UUID string
+try await sdk.connect("MindWave Mobile", mode: .btClassic)  // BT Classic (macOS only)
+```
+
+#### `findDeviceIdentifier(_:timeout:)`
+
+Scans for a BLE peripheral whose name contains `deviceName` (case-insensitive) and returns its `CBPeripheral.identifier` UUID string. Returns `nil` if no match is found within `timeout` seconds.
+
+```swift
+if let uuid = await sdk.findDeviceIdentifier("MindWave") {
+    UserDefaults.standard.set(uuid, forKey: "deviceUUID")
+    try await sdk.connect(uuid)
+}
+```
+
+Cache the returned UUID to avoid scanning on every app launch.
+
+---
+
+## TransportMode
+
+Selects which Bluetooth transport to use when calling `connect(_:mode:)`.
+
+```swift
+public enum TransportMode {
+    case ble         // CoreBluetooth BLE. Default. iOS + macOS.
+    case btClassic   // IOBluetooth RFCOMM SPP. macOS only. Requires pairing first.
+}
+```
 
 ---
 
 ## BrainWaveData
 
-`Sendable` struct. EEG 헤드셋 데이터 스냅샷.
+`Sendable` struct. Snapshot of EEG headset data.
 
-| 필드 | 타입 | 범위 | 설명 |
-|------|------|------|------|
-| `timestamp` | `Int64` | Unix ms | 수신 시각 |
-| `poorSignal` | `Int` | 0~200 | 0=완벽, 200=무신호 |
-| `attention` | `Int` | 0~100 | 집중도 |
-| `meditation` | `Int` | 0~100 | 명상도 |
-| `delta` | `Int` | 0~ | 델타파 (0.5~2.75 Hz) |
-| `theta` | `Int` | 0~ | 세타파 (3.5~6.75 Hz) |
-| `lowAlpha` | `Int` | 0~ | 알파 저주파 (7.5~9.25 Hz) |
-| `highAlpha` | `Int` | 0~ | 알파 고주파 (10~11.75 Hz) |
-| `lowBeta` | `Int` | 0~ | 베타 저주파 (13~16.75 Hz) |
-| `highBeta` | `Int` | 0~ | 베타 고주파 (18~29.75 Hz) |
-| `lowGamma` | `Int` | 0~ | 감마 저주파 (31~39.75 Hz) |
-| `midGamma` | `Int` | 0~ | 감마 중주파 (41~49.75 Hz) |
-| `rawEeg` | `[Int]` | -32768~32767 | 패킷당 10샘플 (512 Hz) |
-| `eyeBlink` | `Int` | 0~ | 눈 깜빡임 강도 |
-| `signalQuality` | `SignalQuality` | — | 계산 프로퍼티 |
+| Field | Type | Range | Description |
+|-------|------|-------|-------------|
+| `timestamp` | `Int64` | Unix ms | Time of reception |
+| `poorSignal` | `Int` | 0–200 | 0 = perfect contact, 200 = no signal |
+| `attention` | `Int` | 0–100 | eSense attention level |
+| `meditation` | `Int` | 0–100 | eSense meditation level |
+| `delta` | `Int` | 0+ | Delta band power (0.5–2.75 Hz) |
+| `theta` | `Int` | 0+ | Theta band power (3.5–6.75 Hz) |
+| `lowAlpha` | `Int` | 0+ | Low alpha band power (7.5–9.25 Hz) |
+| `highAlpha` | `Int` | 0+ | High alpha band power (10–11.75 Hz) |
+| `lowBeta` | `Int` | 0+ | Low beta band power (13–16.75 Hz) |
+| `highBeta` | `Int` | 0+ | High beta band power (18–29.75 Hz) |
+| `lowGamma` | `Int` | 0+ | Low gamma band power (31–39.75 Hz) |
+| `midGamma` | `Int` | 0+ | Mid gamma band power (41–49.75 Hz) |
+| `rawEeg` | `[Int]` | −32768–32767 | 10 samples per packet at 512 Hz |
+| `eyeBlink` | `Int` | 0+ | Eye blink intensity (0 = not detected) |
+| `signalQuality` | `SignalQuality` | — | Computed from `poorSignal` |
 
 ---
 
@@ -88,71 +123,80 @@ public enum ConnectionState {
 
 ---
 
+## TransportError
+
+```swift
+public enum TransportError: Error {
+    case btClassicNotAvailableOniOS  // BT Classic is macOS only
+}
+```
+
+---
+
 ## NeuroSkyCommand
 
-| 상수 | 값 | 설명 |
-|------|----|------|
-| `startRawEeg` | `0x15` | Raw EEG 수신 시작 |
-| `stopRawEeg` | `0x16` | Raw EEG 수신 중지 |
-| `startEsense` | `0x17` | eSense 수신 시작 |
-| `stopEsense` | `0x18` | eSense 수신 중지 |
-| `notch50Hz` | `0x1B` | 50Hz 노치 필터 |
-| `notch60Hz` | `0x1C` | 60Hz 노치 필터 |
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `startRawEeg` | `0x15` | Start Raw EEG streaming |
+| `stopRawEeg` | `0x16` | Stop Raw EEG streaming |
+| `startEsense` | `0x17` | Start eSense streaming |
+| `stopEsense` | `0x18` | Stop eSense streaming |
+| `notch50Hz` | `0x1B` | 50 Hz notch filter |
+| `notch60Hz` | `0x1C` | 60 Hz notch filter |
 
 ---
 
 ## NeuroSkyUUID
 
-| 상수 | UUID |
-|------|------|
+| Constant | UUID |
+|----------|------|
 | `esense` | 039afff8-2c94-11e3-9e06-0002a5d5c51b |
 | `handshake` | 039affa0-2c94-11e3-9e06-0002a5d5c51b |
 | `rawEeg` | 039afff4-2c94-11e3-9e06-0002a5d5c51b |
-| `spp` | 00001101-0000-1000-8000-00805f9b34fb |
+| `spp` | 00001101-0000-1000-8000-00805f9b34fb (BT Classic SPP) |
 
 ---
 
 ## SimulatorTransport
 
-실기기 없이 개발할 때 사용하는 Transport. Debug 빌드 전용 권장.
+Transport for development without a real headset. Emits synthetic data once per second. Recommended for `#if DEBUG` blocks only.
 
-### 초기화
+Use via `NeuroSkySdk(simulator:)` — direct instantiation is also supported for custom injection.
+
+### Initializer
 
 ```swift
 init(mode: SimulatorTransport.Mode = .random)
 ```
 
-### 메서드
+### Methods
 
-| 메서드 | 설명 |
-|--------|------|
-| `setMode(_ mode: Mode)` | 실행 중 모드 변경 (즉시 적용) |
-
-> `NeuroSkySdk(simulator:)`로 초기화하면 내부적으로 SimulatorTransport가 사용됨.
-> SimulatorTransport를 직접 사용할 경우 Transport 프로토콜을 통해 주입 가능.
+| Method | Description |
+|--------|-------------|
+| `setMode(_ mode: Mode)` | Change the simulation mode at runtime |
 
 ### SimulatorTransport.Mode
 
-| 모드 | attention | meditation | 설명 |
-|------|-----------|------------|------|
-| `.random` | 20~80 | 20~80 | 랜덤 값 (poorSignal 0~10) |
-| `.focused` | 70~95 | 40~60 | 집중 상태 (poorSignal=0) |
-| `.relaxed` | 20~45 | 70~95 | 이완 상태 (poorSignal=0) |
-| `.poorSignal` | 0 | 0 | 무신호 (poorSignal=200) |
+| Mode | `attention` | `meditation` | Description |
+|------|-------------|--------------|-------------|
+| `.random` | 20–80 | 20–80 | Random values, `poorSignal` 0–10 |
+| `.focused` | 70–95 | 40–60 | Focused state, `poorSignal` = 0 |
+| `.relaxed` | 20–45 | 70–95 | Relaxed state, `poorSignal` = 0 |
+| `.poorSignal` | 0 | 0 | No signal, `poorSignal` = 200 |
 
 ---
 
 ## ThinkGearParser
 
-직접 사용이 필요한 경우를 위해 공개.
+Exposed publicly for advanced use cases (e.g. custom BT Classic parsing).
 
 ```swift
-// eSense 패킷 파싱 (0xEA / 0xEB / 0xEC)
+// Parse eSense characteristic data (0xEA / 0xEB / 0xEC packets)
 func parseEsense(_ data: Data) -> BrainWaveData?
 
-// Raw EEG 파싱
+// Parse RawEEG characteristic data (10 signed samples per 20-byte packet)
 func parseRawEeg(_ data: Data) -> BrainWaveData
 
-// 핸드셰이크 패킷 생성 (static)
+// Build a 20-byte handshake packet for the given command byte
 static func buildHandshake(command: UInt8) -> Data
 ```
