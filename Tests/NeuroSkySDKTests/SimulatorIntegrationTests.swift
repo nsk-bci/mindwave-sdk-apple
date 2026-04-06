@@ -9,6 +9,7 @@ final class SimulatorIntegrationTests: XCTestCase {
 
     // MARK: - Connection lifecycle
 
+    @MainActor
     func test_connect_yieldsConnectingThenConnected() async throws {
         let sdk = await NeuroSkySdk(simulator: .random)
         var states: [ConnectionState] = []
@@ -26,6 +27,7 @@ final class SimulatorIntegrationTests: XCTestCase {
         XCTAssertEqual(states, [.connecting, .connected])
     }
 
+    @MainActor
     func test_disconnect_yieldsDisconnected() async throws {
         let sdk = await NeuroSkySdk(simulator: .random)
 
@@ -128,6 +130,7 @@ final class SimulatorIntegrationTests: XCTestCase {
 
     // MARK: - Multiple packets
 
+    @MainActor
     func test_receivesMultiplePacketsOverTime() async throws {
         let sdk = await NeuroSkySdk(simulator: .focused)
         try await sdk.connect("sim")
