@@ -475,6 +475,8 @@ Task {
         try await sdk.connect("MindWave Mobile")
     } catch BLEError.bluetoothUnavailable {
         showAlert("Bluetooth is off — enable it in Settings")
+    } catch BLEError.deviceNotFound {
+        showAlert("Headset not found within timeout — is it on and nearby?")
     } catch BLEError.connectionFailed {
         showAlert("Connection failed — is the headset on and nearby?")
     } catch BTError.deviceNotFound {
@@ -486,6 +488,22 @@ Task {
     }
 }
 ```
+
+### Connection timeout
+
+BLE `connect()` is bounded by a timeout (default **10 seconds**). If the scan
+and handshake do not complete in time, `BLEError.deviceNotFound` is thrown
+instead of suspending forever:
+
+```swift
+// Default 10 s
+try await sdk.connect("MindWave Mobile")
+
+// Custom — useful when retrying or when you know the device is nearby
+try await sdk.connect("MindWave Mobile", timeout: 5)
+```
+
+The timeout applies to BLE only. BT Classic and simulator modes ignore it.
 
 ### Automatic reconnection
 
@@ -786,7 +804,13 @@ public final class NeuroSkySdk {
     /// Connect to headset by name or address
     /// - iOS: BLE only
     /// - mode: Transport to use. Defaults to `.ble`. Pass `.btClassic` on macOS for SPP.
-    public func connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws
+    /// - timeout: Max seconds to wait for BLE scan + handshake. Throws
+    ///   `BLEError.deviceNotFound` on expiry. Default 10. Ignored for BT Classic and simulator.
+    public func connect(
+        _ deviceAddress: String,
+        mode: TransportMode = .ble,
+        timeout: TimeInterval = 10
+    ) async throws
 
     /// Scan for a BLE peripheral by name and return its OS-assigned UUID string.
     /// Cache the result to skip scanning on subsequent launches.

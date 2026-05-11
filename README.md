@@ -98,6 +98,19 @@ That's it — three steps from zero to streaming EEG data.
 | BLE (default) | `sdk.connect("MindWave Mobile")` | iOS + macOS | No |
 | BT Classic | `sdk.connect("MindWave Mobile", mode: .btClassic)` | macOS only | Yes |
 
+### Connection timeout
+
+BLE scan + handshake is bounded by a timeout (default **10 seconds**). If the
+headset is off or out of range, `connect()` throws `BLEError.deviceNotFound`
+instead of hanging.
+
+```swift
+try await sdk.connect("MindWave Mobile", timeout: 5)   // shorter wait
+try await sdk.connect("MindWave Mobile")               // default 10 s
+```
+
+The timeout is ignored for BT Classic and simulator modes.
+
 ## Finding Your Device Identifier
 
 CoreBluetooth does not expose MAC addresses. Use `findDeviceIdentifier` to
