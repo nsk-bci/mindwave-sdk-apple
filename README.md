@@ -48,6 +48,10 @@ targets: [
 <true/>
 ```
 
+> **Privacy Manifest:** the SDK ships its own `PrivacyInfo.xcprivacy` declaring
+> no tracking and no data collection. You do **not** need to add one for the
+> SDK — only for your own app.
+
 ### Step 3 — Connect and stream
 
 ```swift

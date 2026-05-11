@@ -91,7 +91,6 @@ public enum TransportMode {
 | `lowGamma` | `Int` | 0+ | Low gamma band power (31–39.75 Hz) |
 | `midGamma` | `Int` | 0+ | Mid gamma band power (41–49.75 Hz) |
 | `rawEeg` | `[Int]` | −32768–32767 | 10 samples per packet at 512 Hz |
-| `eyeBlink` | `Int` | 0+ | Eye blink intensity (0 = not detected) |
 | `signalQuality` | `SignalQuality` | — | Computed from `poorSignal` |
 
 ---

@@ -80,7 +80,14 @@ public final class NeuroSkySdk {
     ///     the `CBPeripheral.identifier` UUID string returned by `findDeviceIdentifier(_:timeout:)`.
     ///   - mode: Transport to use. Defaults to `.ble` (iOS + macOS).
     ///     Pass `.btClassic` on macOS to use Bluetooth Classic SPP.
-    public func connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws {
+    ///   - timeout: Maximum seconds to wait for the BLE scan + connect handshake.
+    ///     Throws `BLEError.deviceNotFound` if the timer expires. Ignored for BT Classic
+    ///     and simulator modes. Default: 10 s.
+    public func connect(
+        _ deviceAddress: String,
+        mode: TransportMode = .ble,
+        timeout: TimeInterval = 10
+    ) async throws {
         // Simulator mode: use the already-configured SimulatorTransport directly.
         if let sim = activeTransport as? SimulatorTransport {
             try await sim.connect(to: deviceAddress)
@@ -89,7 +96,7 @@ public final class NeuroSkySdk {
 
         switch mode {
         case .ble:
-            try await connectBLE(deviceAddress)
+            try await connectBLE(deviceAddress, timeout: timeout)
         case .btClassic:
             #if os(macOS)
             try await connectBTClassic(deviceAddress)
@@ -167,9 +174,9 @@ public final class NeuroSkySdk {
 
     // MARK: - Private
 
-    private func connectBLE(_ deviceAddress: String) async throws {
+    private func connectBLE(_ deviceAddress: String, timeout: TimeInterval) async throws {
         switchTransport(to: bleTransport)
-        try await bleTransport.connect(to: deviceAddress)
+        try await bleTransport.connect(to: deviceAddress, timeout: timeout)
     }
 
     #if os(macOS)

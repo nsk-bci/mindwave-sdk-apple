@@ -33,6 +33,9 @@ public final class BLETransport: NSObject, Transport {
     /// Suspends the connect() caller until BLE connection is fully established.
     private var connectContinuation: CheckedContinuation<Void, Error>?
 
+    /// Fires if the scan/connect does not complete within the caller-supplied timeout.
+    private var timeoutTask: Task<Void, Never>?
+
     /// Tracks which characteristics have had notifications enabled.
     /// Both eSense and RawEEG must be notifying before the connection is considered complete.
     private var notifiedCharacteristics: Set<String> = []
@@ -59,6 +62,16 @@ public final class BLETransport: NSObject, Transport {
 
     /// Suspend until BLE connection is fully established (handshake sent).
     public func connect(to deviceAddress: String) async throws {
+        try await connect(to: deviceAddress, timeout: 10)
+    }
+
+    /// Suspend until BLE connection is fully established, or the timeout fires.
+    ///
+    /// - Parameters:
+    ///   - deviceAddress: Peripheral name substring or `CBPeripheral.identifier` UUID string.
+    ///   - timeout: Maximum seconds to wait for scan + connect + handshake to complete.
+    ///     Throws `BLEError.deviceNotFound` on expiry. Default: 10 s.
+    public func connect(to deviceAddress: String, timeout: TimeInterval) async throws {
         targetAddress = deviceAddress
         notifiedCharacteristics.removeAll()
         stateContinuation.yield(.scanning)
@@ -66,14 +79,19 @@ public final class BLETransport: NSObject, Transport {
         try await withCheckedThrowingContinuation { continuation in
             self.connectContinuation = continuation
             self.central.scanForPeripherals(withServices: nil, options: nil)
+
+            self.timeoutTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                guard let self, !Task.isCancelled else { return }
+                self.failConnect(with: BLEError.deviceNotFound)
+            }
         }
     }
 
     public func disconnect() async {
         central.stopScan()
         // Resume any pending connect() with an error to prevent a hang
-        connectContinuation?.resume(throwing: CancellationError())
-        connectContinuation = nil
+        failConnect(with: CancellationError())
         if let p = peripheral {
             central.cancelPeripheralConnection(p)
         }
@@ -106,7 +124,18 @@ public final class BLETransport: NSObject, Transport {
         stateContinuation.yield(.connected)
         Task { try? await sendCommand(NeuroSkyCommand.startEsense) }
 
+        timeoutTask?.cancel()
+        timeoutTask = nil
         connectContinuation?.resume()
+        connectContinuation = nil
+    }
+
+    /// Resume any pending connect() with an error and cancel the timeout.
+    /// Safe to call multiple times — only the first call has an effect.
+    private func failConnect(with error: Error) {
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        connectContinuation?.resume(throwing: error)
         connectContinuation = nil
     }
 }
@@ -119,8 +148,7 @@ extension BLETransport: CBCentralManagerDelegate {
         if central.state != .poweredOn {
             let err = BLEError.bluetoothUnavailable
             stateContinuation.yield(.error(err))
-            connectContinuation?.resume(throwing: err)
-            connectContinuation = nil
+            failConnect(with: err)
         }
     }
 
@@ -150,6 +178,9 @@ extension BLETransport: CBCentralManagerDelegate {
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
     ) {
+        // If the peripheral drops while connect() is still suspended, fail the
+        // pending continuation so the caller does not hang forever.
+        failConnect(with: error ?? BLEError.connectionFailed)
         stateContinuation.yield(.disconnected)
     }
 
@@ -160,8 +191,7 @@ extension BLETransport: CBCentralManagerDelegate {
     ) {
         let err = error ?? BLEError.connectionFailed
         stateContinuation.yield(.error(err))
-        connectContinuation?.resume(throwing: err)
-        connectContinuation = nil
+        failConnect(with: err)
     }
 }
 

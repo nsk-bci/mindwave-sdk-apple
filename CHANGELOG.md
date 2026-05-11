@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `PrivacyInfo.xcprivacy` shipped with the SDK (no tracking, no data collection)
+- BLE connect timeout — `connect(_:mode:timeout:)` throws `BLEError.deviceNotFound`
+  if the scan + handshake does not finish within the supplied window (default 10 s)
+
+### Fixed
+- `connect()` no longer hangs when the peripheral disconnects mid-handshake
+  (`didDisconnectPeripheral` now resumes the pending continuation with an error)
+
+### Removed
+- `BrainWaveData.eyeBlink` — the field was never populated by the parser and
+  has been removed to keep the public API honest. Will be reintroduced when
+  blink-strength packet parsing is implemented.
+
 ## [1.0.0] — 2026-04-06
 
 ### Added

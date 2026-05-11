@@ -16,7 +16,10 @@ let package = Package(
     targets: [
         .target(
             name: "NeuroSkySDK",
-            path: "Sources/NeuroSkySDK"
+            path: "Sources/NeuroSkySDK",
+            resources: [
+                .copy("PrivacyInfo.xcprivacy"),
+            ]
         ),
         .testTarget(
             name: "NeuroSkySDKTests",

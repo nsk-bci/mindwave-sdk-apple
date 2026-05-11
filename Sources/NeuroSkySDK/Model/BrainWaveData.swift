@@ -28,9 +28,6 @@ public struct BrainWaveData: Sendable {
     /// Raw EEG samples (10 samples per packet, 512 Hz)
     public let rawEeg: [Int]
 
-    /// Eye blink intensity (0 = not detected)
-    public let eyeBlink: Int
-
     public init(
         timestamp: Int64 = Int64(Date().timeIntervalSince1970 * 1000),
         poorSignal: Int = 0,
@@ -44,8 +41,7 @@ public struct BrainWaveData: Sendable {
         highBeta: Int = 0,
         lowGamma: Int = 0,
         midGamma: Int = 0,
-        rawEeg: [Int] = [],
-        eyeBlink: Int = 0
+        rawEeg: [Int] = []
     ) {
         self.timestamp = timestamp
         self.poorSignal = poorSignal
@@ -60,7 +56,6 @@ public struct BrainWaveData: Sendable {
         self.lowGamma = lowGamma
         self.midGamma = midGamma
         self.rawEeg = rawEeg
-        self.eyeBlink = eyeBlink
     }
 
     /// Derived signal quality enum
