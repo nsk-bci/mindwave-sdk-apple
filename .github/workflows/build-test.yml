@@ -1,0 +1,53 @@
+# .github/workflows/build-test.yml
+# Apple iOS/macOS 매트릭스 빌드 & 테스트
+name: Build & Test (Apple Matrix)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: iOS
+            destination: "platform=iOS Simulator,name=iPhone 15,OS=17.5"
+            runner: macos-14
+          - platform: iOS
+            destination: "platform=iOS Simulator,name=iPhone 15,OS=18.0"
+            runner: macos-14
+          - platform: macOS
+            destination: "platform=macOS"
+            runner: macos-14
+          - platform: macOS
+            destination: "platform=macOS"
+            runner: macos-15
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode (macos-14 → Xcode 15.4)
+        if: matrix.runner == 'macos-14'
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      # macos-15는 기본 Xcode (16.x) 사용
+
+      - name: Build SDK
+        run: |
+          xcodebuild build \
+            -scheme NeuroSkySDK \
+            -destination "${{ matrix.destination }}" \
+            -configuration Debug
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -scheme NeuroSkySDK \
+            -destination "${{ matrix.destination }}" \
+            -configuration Debug
