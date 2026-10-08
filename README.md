@@ -273,7 +273,7 @@ Update your dependency to `from: "7.0.0"`.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the full history.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
