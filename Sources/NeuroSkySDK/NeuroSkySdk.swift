@@ -3,9 +3,7 @@ import CoreBluetooth
 
 /// Entry point for the NeuroSky MindWave Apple SDK.
 ///
-/// BLE is used by default. Pass `mode: .btClassic` on macOS to connect via
-/// Bluetooth Classic SPP instead (requires the headset to be paired first in
-/// System Settings → Bluetooth).
+/// Talks to the MindWave Mobile 2 over BLE (CoreBluetooth) on iOS and macOS.
 ///
 /// ```swift
 /// let sdk = NeuroSkySdk()
@@ -41,10 +39,6 @@ public final class NeuroSkySdk {
 
     private lazy var bleTransport = BLETransport()
 
-    #if os(macOS)
-    private lazy var btClassicTransport = BTClassicTransport()
-    #endif
-
     // MARK: - Init
 
     /// Initialize for use with a real headset.
@@ -76,16 +70,13 @@ public final class NeuroSkySdk {
     /// Connect to the headset by device name or identifier string.
     ///
     /// - Parameters:
-    ///   - deviceAddress: The peripheral name (e.g. `"MindWave Mobile"`) or, for BLE,
+    ///   - deviceAddress: The peripheral name (e.g. `"MindWave Mobile"`) or
     ///     the `CBPeripheral.identifier` UUID string returned by `findDeviceIdentifier(_:timeout:)`.
-    ///   - mode: Transport to use. Defaults to `.ble` (iOS + macOS).
-    ///     Pass `.btClassic` on macOS to use Bluetooth Classic SPP.
     ///   - timeout: Maximum seconds to wait for the BLE scan + connect handshake.
-    ///     Throws `BLEError.deviceNotFound` if the timer expires. Ignored for BT Classic
-    ///     and simulator modes. Default: 10 s.
+    ///     Throws `BLEError.deviceNotFound` if the timer expires. Ignored in
+    ///     simulator mode. Default: 10 s.
     public func connect(
         _ deviceAddress: String,
-        mode: TransportMode = .ble,
         timeout: TimeInterval = 10
     ) async throws {
         // Simulator mode: use the already-configured SimulatorTransport directly.
@@ -94,16 +85,7 @@ public final class NeuroSkySdk {
             return
         }
 
-        switch mode {
-        case .ble:
-            try await connectBLE(deviceAddress, timeout: timeout)
-        case .btClassic:
-            #if os(macOS)
-            try await connectBTClassic(deviceAddress)
-            #else
-            throw TransportError.btClassicNotAvailableOniOS
-            #endif
-        }
+        try await connectBLE(deviceAddress, timeout: timeout)
     }
 
     /// Disconnect from the headset and release all resources.
@@ -148,7 +130,7 @@ public final class NeuroSkySdk {
     /// Scan for a BLE peripheral whose name contains `deviceName` and return
     /// its `CBPeripheral.identifier` UUID string.
     ///
-    /// The returned string can be passed directly to `connect(_:mode:)` as the
+    /// The returned string can be passed directly to `connect(_:timeout:)` as the
     /// `deviceAddress` argument.  Cache the result to avoid scanning on every
     /// app launch.
     ///
@@ -178,13 +160,6 @@ public final class NeuroSkySdk {
         switchTransport(to: bleTransport)
         try await bleTransport.connect(to: deviceAddress, timeout: timeout)
     }
-
-    #if os(macOS)
-    private func connectBTClassic(_ deviceAddress: String) async throws {
-        switchTransport(to: btClassicTransport)
-        try await btClassicTransport.connect(to: deviceAddress)
-    }
-    #endif
 
     /// Replace the active transport and restart stream forwarding.
     private func switchTransport(to transport: any Transport) {
@@ -276,11 +251,4 @@ private final class BLEDeviceFinder: NSObject, CBCentralManagerDelegate {
         central = nil
         completion(result)
     }
-}
-
-// MARK: - Errors
-
-public enum TransportError: Error {
-    /// BT Classic transport is only available on macOS.
-    case btClassicNotAvailableOniOS
 }

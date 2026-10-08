@@ -4,9 +4,6 @@ public enum NeuroSkyUUID {
     public static let handshake = "039affa0-2c94-11e3-9e06-0002a5d5c51b"
     public static let rawEeg    = "039afff4-2c94-11e3-9e06-0002a5d5c51b"
     public static let cccd      = "00002902-0000-1000-8000-00805f9b34fb"
-
-    /// BT Classic SPP UUID
-    public static let spp       = "00001101-0000-1000-8000-00805f9b34fb"
 }
 
 /// NeuroSky headset command bytes

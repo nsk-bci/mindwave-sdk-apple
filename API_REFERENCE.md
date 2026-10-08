@@ -27,7 +27,7 @@ init(simulator mode: SimulatorTransport.Mode = .random)
 
 | Method | Description |
 |--------|-------------|
-| `connect(_ deviceAddress: String, mode: TransportMode = .ble) async throws` | Connect by peripheral name or UUID string |
+| `connect(_ deviceAddress: String, timeout: TimeInterval = 10) async throws` | Connect over BLE by peripheral name or UUID string |
 | `disconnect() async` | Disconnect and release all resources |
 | `findDeviceIdentifier(_ deviceName: String, timeout: TimeInterval = 10) async -> String?` | Scan for a BLE peripheral by name, returns its UUID string |
 | `sendCommand(_ command: UInt8) async throws` | Send a raw command byte to the headset |
@@ -36,12 +36,11 @@ init(simulator mode: SimulatorTransport.Mode = .random)
 | `setNotch50Hz() async throws` | Apply 50 Hz notch filter (China / Europe) |
 | `setNotch60Hz() async throws` | Apply 60 Hz notch filter (Korea / USA) |
 
-#### `connect(_:mode:)`
+#### `connect(_:timeout:)`
 
 ```swift
-try await sdk.connect("MindWave Mobile")               // BLE by name (default)
-try await sdk.connect(savedUUID)                        // BLE by UUID string
-try await sdk.connect("MindWave Mobile", mode: .btClassic)  // BT Classic (macOS only)
+try await sdk.connect("MindWave Mobile")               // by name
+try await sdk.connect(savedUUID)                        // by UUID string
 ```
 
 #### `findDeviceIdentifier(_:timeout:)`
@@ -56,19 +55,6 @@ if let uuid = await sdk.findDeviceIdentifier("MindWave") {
 ```
 
 Cache the returned UUID to avoid scanning on every app launch.
-
----
-
-## TransportMode
-
-Selects which Bluetooth transport to use when calling `connect(_:mode:)`.
-
-```swift
-public enum TransportMode {
-    case ble         // CoreBluetooth BLE. Default. iOS + macOS.
-    case btClassic   // IOBluetooth RFCOMM SPP. macOS only. Requires pairing first.
-}
-```
 
 ---
 
@@ -122,16 +108,6 @@ public enum ConnectionState {
 
 ---
 
-## TransportError
-
-```swift
-public enum TransportError: Error {
-    case btClassicNotAvailableOniOS  // BT Classic is macOS only
-}
-```
-
----
-
 ## NeuroSkyCommand
 
 | Constant | Value | Description |
@@ -152,7 +128,6 @@ public enum TransportError: Error {
 | `esense` | 039afff8-2c94-11e3-9e06-0002a5d5c51b |
 | `handshake` | 039affa0-2c94-11e3-9e06-0002a5d5c51b |
 | `rawEeg` | 039afff4-2c94-11e3-9e06-0002a5d5c51b |
-| `spp` | 00001101-0000-1000-8000-00805f9b34fb (BT Classic SPP) |
 
 ---
 
@@ -187,7 +162,7 @@ init(mode: SimulatorTransport.Mode = .random)
 
 ## ThinkGearParser
 
-Exposed publicly for advanced use cases (e.g. custom BT Classic parsing).
+Exposed publicly for advanced use cases (e.g. parsing captured BLE packets).
 
 ```swift
 // Parse eSense characteristic data (0xEA / 0xEB / 0xEC packets)

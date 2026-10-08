@@ -73,31 +73,6 @@ public final class ThinkGearParser {
         return Data(bytes)
     }
 
-    // MARK: - BT Classic helpers
-
-    /// Selectively update eSense fields and return a snapshot.
-    /// Parameters that are `nil` retain their last accumulated value.
-    public func updateAndSnapshot(poorSignal: Int? = nil, attention: Int? = nil, meditation: Int? = nil) -> BrainWaveData {
-        if let v = poorSignal  { self.poorSignal  = v }
-        if let v = attention   { self.attention   = v }
-        if let v = meditation  { self.meditation  = v }
-        return makeSnapshot()
-    }
-
-    /// Parse a BT Classic 0x83 EEG Power TLV payload (24 bytes = 8 × 3-byte big-endian).
-    public func parseEEGPowerBT(_ bytes: [UInt8]) -> BrainWaveData? {
-        guard bytes.count >= 24 else { return nil }
-        delta     = int24(bytes, offset: 0)
-        theta     = int24(bytes, offset: 3)
-        lowAlpha  = int24(bytes, offset: 6)
-        highAlpha = int24(bytes, offset: 9)
-        lowBeta   = int24(bytes, offset: 12)
-        highBeta  = int24(bytes, offset: 15)
-        lowGamma  = int24(bytes, offset: 18)
-        midGamma  = int24(bytes, offset: 21)
-        return makeSnapshot()
-    }
-
     // MARK: - Private
 
     private func parseEA(_ bytes: [UInt8]) -> BrainWaveData? {
