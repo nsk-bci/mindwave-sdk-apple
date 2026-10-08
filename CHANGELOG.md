@@ -14,6 +14,11 @@ Releases before 7.0.0 are documented in the [legacy changelog (v1.0.0)](https://
 ### Added
 - eyeBlink parsing
 
+### Fixed
+- BLE eSense packets were never parsed, so `attention`, `meditation`, `poorSignal`, and the eight bands
+  stayed 0 on a real MWM2: the packet type is at `bytes[2]` (after a 2-byte `00 00` prefix), not `bytes[0]`.
+  Same fix as the Windows SDK v2.0.4.
+
 ## [7.0.0] - TBD
 
 First release of the renewed MindWave SDK line for iOS and macOS.

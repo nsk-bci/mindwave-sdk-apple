@@ -31,9 +31,12 @@ public final class ThinkGearParser {
     /// - Returns: Updated `BrainWaveData` snapshot, or `nil` for unknown packet types.
     public func parseEsense(_ data: Data) -> BrainWaveData? {
         let bytes = [UInt8](data)
-        guard !bytes.isEmpty else { return nil }
+        // MWM2 BLE eSense payloads start with a 2-byte prefix (00 00); the packet type is at
+        // bytes[2]. Field offsets (6/8/10, 5/9/13/17) already count the prefix.
+        // Matches the reference SDK (MWMleService: `byte packType = data[2]`).
+        guard bytes.count >= 3 else { return nil }
 
-        switch bytes[0] {
+        switch bytes[2] {
         case 0xEA: return parseEA(bytes)
         case 0xEB: return parseEB(bytes)
         case 0xEC: return parseEC(bytes)
