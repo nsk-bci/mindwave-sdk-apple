@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Removed
+- Bluetooth Classic transport (BLE-only from v7.0.0)
+
+### Added
+- eyeBlink parsing
+
+## [7.0.0] - TBD
+
+### Changed
+- Version scheme realigned with the MindWave SDK line (legacy 4.x)
+- README / developer guide install examples updated to `from: "7.0.0"`
+- `LICENSE` replaced with the verbatim Apache License 2.0 text (the previous file was an abridged, non-standard rendition)
+
 ### Added
 - `PrivacyInfo.xcprivacy` shipped with the SDK (no tracking, no data collection)
 - BLE connect timeout — `connect(_:mode:timeout:)` throws `BLEError.deviceNotFound`

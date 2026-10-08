@@ -7,6 +7,10 @@
 
 Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 
+> [!NOTE]
+> v7.0.0 continues the MindWave SDK line (legacy 4.x), rebuilt from scratch
+> for the BLE-only MindWave Mobile 2. Bluetooth Classic support is removed.
+
 ---
 
 ## Getting Started
@@ -22,7 +26,7 @@ Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 **Package.swift:**
 ```swift
 dependencies: [
-    .package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "1.0.0")
+    .package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "7.0.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: ["NeuroSkySDK"])

@@ -3,7 +3,7 @@ title: NeuroSky MindWave Mobile Apple SDK — Developer Guide
 ---
 
 # NeuroSky MindWave Mobile Apple SDK
-## Developer Guide · v1.0.0
+## Developer Guide · v7.0.0
 
 ---
 
@@ -149,7 +149,7 @@ This SDK is designed and tested for the **NeuroSky MindWave Mobile 2**. Both BLE
 1. Open your project in Xcode
 2. File → Add Package Dependencies
 3. Enter: `https://github.com/nsk-bci/mindwave-sdk-apple`
-4. Select version rule: **Up to Next Major** from `1.0.0`
+4. Select version rule: **Up to Next Major** from `7.0.0`
 5. Click **Add Package**
 
 ### Swift Package Manager — Package.swift
@@ -157,7 +157,7 @@ This SDK is designed and tested for the **NeuroSky MindWave Mobile 2**. Both BLE
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "1.0.0")
+    .package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "7.0.0")
 ],
 targets: [
     .target(
