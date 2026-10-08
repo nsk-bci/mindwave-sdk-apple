@@ -16,7 +16,7 @@ Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 ## Getting Started
 
 > [!TIP]
-> Before diving into the steps — read the [Developer Guide (PDF)](docs/developer-guide.pdf) first.
+> Before diving into the steps — read the [Developer Guide](docs/developer-guide.md) first.
 > It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add the package
@@ -263,6 +263,13 @@ Sources/NeuroSkySDK/
 └── Simulator/
     └── SimulatorTransport.swift Developer simulator
 ```
+
+## Migration
+
+### From 1.x to 7.0.0
+
+SPM users pinned to `from: "1.0.0"` will not receive v7.0.0 automatically.
+Update your dependency to `from: "7.0.0"`.
 
 ## Changelog
 

@@ -14,8 +14,11 @@
 - Version scheme realigned with the MindWave SDK line (legacy 4.x)
 - README / developer guide install examples updated to `from: "7.0.0"`
 - `LICENSE` replaced with the verbatim Apache License 2.0 text (the previous file was an abridged, non-standard rendition)
+- SPM users pinned to `from: "1.0.0"` will not receive v7.0.0 automatically.
+  Update your dependency to `from: "7.0.0"`.
 
 ### Added
+- `NOTICE` (Copyright 2024-2026 NeuroSky, Inc.)
 - `PrivacyInfo.xcprivacy` shipped with the SDK (no tracking, no data collection)
 - BLE connect timeout — `connect(_:mode:timeout:)` throws `BLEError.deviceNotFound`
   if the scan + handshake does not finish within the supplied window (default 10 s)
@@ -25,6 +28,7 @@
   (`didDisconnectPeripheral` now resumes the pending continuation with an error)
 
 ### Removed
+- `developer-guide.pdf` and `docs/developer-guide.pdf` — superseded by `docs/developer-guide.md`; integrated developer and user guides will follow
 - `BrainWaveData.eyeBlink` — the field was never populated by the parser and
   has been removed to keep the public API honest. Will be reintroduced when
   blink-strength packet parsing is implemented.
