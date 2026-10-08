@@ -15,7 +15,10 @@ Releases before 7.0.0 are documented in the [legacy changelog (v1.0.0)](https://
   (`updateAndSnapshot(poorSignal:attention:meditation:)`, `parseEEGPowerBT(_:)`)
 
 ### Added
-- eyeBlink parsing
+- Eye blink detection: `NeuroSkySdk.blinkStream` emits a `BlinkEvent(timestampMs, strength, sequence)` per blink.
+  `BlinkDetector` watches raw EEG peak-to-peak amplitude (100-sample window, 600 ms cooldown, 500 ms warm-up;
+  threshold provisional until measured on a device). Requires the Raw EEG stream; paused while
+  `poorSignal` > 50. `Transport` gains `blinkStream` (default: an empty, finished stream).
 
 ## [7.0.0] - TBD
 
@@ -43,5 +46,5 @@ First release of the renewed MindWave SDK line for iOS and macOS.
 - `connect()` no longer hangs when the peripheral disconnects mid-handshake
 
 ### Removed
-- `BrainWaveData.eyeBlink`: it was never populated. It returns with eyeBlink parsing (see Unreleased)
+- `BrainWaveData.eyeBlink`: it was never populated. Blinks are delivered on `blinkStream` instead (see Unreleased)
 - Developer guide PDFs: superseded by [`docs/developer-guide.md`](docs/developer-guide.md)

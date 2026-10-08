@@ -32,6 +32,9 @@ public protocol Transport: AnyObject {
     /// Connection state stream
     var stateStream: AsyncStream<ConnectionState> { get }
 
+    /// Eye blink events. Transports that do not detect blinks (e.g. the simulator) finish immediately.
+    var blinkStream: AsyncStream<BlinkEvent> { get }
+
     /// Connect to a device by address or name
     func connect(to deviceAddress: String) async throws
 
@@ -40,4 +43,9 @@ public protocol Transport: AnyObject {
 
     /// Send a command byte to the headset
     func sendCommand(_ command: UInt8) async throws
+}
+
+public extension Transport {
+    /// Default: no blink detection — an already-finished stream.
+    var blinkStream: AsyncStream<BlinkEvent> { AsyncStream { $0.finish() } }
 }

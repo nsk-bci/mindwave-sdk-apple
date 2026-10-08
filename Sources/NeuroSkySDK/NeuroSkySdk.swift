@@ -28,8 +28,13 @@ public final class NeuroSkySdk {
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
 
+    /// Eye blink events, one per detected blink. Detection runs on raw EEG, so call
+    /// `startRawEeg()` first; nothing is emitted while `signalQuality` is `.poor` or `.noSignal`.
+    public let blinkStream: AsyncStream<BlinkEvent>
+
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
+    private let blinkContinuation: AsyncStream<BlinkEvent>.Continuation
 
     // MARK: - Internal state
 
@@ -45,20 +50,26 @@ public final class NeuroSkySdk {
     public init() {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
+        var blinkCont: AsyncStream<BlinkEvent>.Continuation!
         dataStream  = AsyncStream { dataCont  = $0 }
         stateStream = AsyncStream { stateCont = $0 }
+        blinkStream = AsyncStream { blinkCont = $0 }
         dataContinuation  = dataCont
         stateContinuation = stateCont
+        blinkContinuation = blinkCont
     }
 
     /// Initialize in simulator mode — no real headset required.
     public init(simulator mode: SimulatorTransport.Mode = .random) {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
+        var blinkCont: AsyncStream<BlinkEvent>.Continuation!
         dataStream  = AsyncStream { dataCont  = $0 }
         stateStream = AsyncStream { stateCont = $0 }
+        blinkStream = AsyncStream { blinkCont = $0 }
         dataContinuation  = dataCont
         stateContinuation = stateCont
+        blinkContinuation = blinkCont
 
         let sim = SimulatorTransport(mode: mode)
         activeTransport = sim
@@ -168,13 +179,20 @@ public final class NeuroSkySdk {
         startForwarding(from: transport)
     }
 
-    /// Forward dataStream and stateStream from the transport to the SDK's
+    /// Forward dataStream, stateStream, and blinkStream from the transport to the SDK's
     /// single unified streams.
     private func startForwarding(from transport: any Transport) {
         let dataCont  = dataContinuation
         let stateCont = stateContinuation
+        let blinkCont = blinkContinuation
         forwardTask = Task {
             await withTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    for await blink in transport.blinkStream {
+                        guard !Task.isCancelled else { break }
+                        blinkCont.yield(blink)
+                    }
+                }
                 group.addTask {
                     for await data in transport.dataStream {
                         guard !Task.isCancelled else { break }

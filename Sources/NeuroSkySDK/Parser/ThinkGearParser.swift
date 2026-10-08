@@ -6,7 +6,15 @@ import Foundation
 /// 0xEB — EEG frequency powers 1/2 (Delta, Theta, LowAlpha, HighAlpha)
 /// 0xEC — EEG frequency powers 2/2 (LowBeta, HighBeta, LowGamma, MidGamma)
 /// RawEEG (039afff4) — 20 bytes, 10 signed samples at 2 bytes each
+///
+/// Raw EEG samples also run through a `BlinkDetector`; each detected blink is passed to
+/// `onBlink` as a `BlinkEvent`. Detection is off until the first 0xEA packet reports signal
+/// quality, and while `poorSignal` exceeds `maxPoorSignal` — electrode contact noise looks
+/// like a blink.
 public final class ThinkGearParser {
+
+    /// `poorSignal` above this (`.poor`, `.noSignal`) pauses blink detection.
+    public static let defaultMaxPoorSignal = 50
 
     // MARK: - Accumulated state
     // Fields are updated incrementally as packets arrive from different characteristics.
@@ -23,7 +31,33 @@ public final class ThinkGearParser {
     private var lowGamma: Int = 0
     private var midGamma: Int = 0
 
-    public init() {}
+    // MARK: - Blink detection
+
+    private let blinkDetector: BlinkDetector
+    private let maxPoorSignal: Int
+    private let onBlink: ((BlinkEvent) -> Void)?
+    private var signalKnown = false
+    private var blinkSequence = 0
+
+    public init(
+        blinkDetector: BlinkDetector = BlinkDetector(),
+        maxPoorSignal: Int = ThinkGearParser.defaultMaxPoorSignal,
+        onBlink: ((BlinkEvent) -> Void)? = nil
+    ) {
+        self.blinkDetector = blinkDetector
+        self.maxPoorSignal = maxPoorSignal
+        self.onBlink = onBlink
+    }
+
+    /// Clear accumulated values, the blink count, and the detector for a new connection.
+    public func reset() {
+        poorSignal = 0; attention = 0; meditation = 0
+        delta = 0; theta = 0; lowAlpha = 0; highAlpha = 0
+        lowBeta = 0; highBeta = 0; lowGamma = 0; midGamma = 0
+        signalKnown = false
+        blinkSequence = 0
+        blinkDetector.reset()
+    }
 
     // MARK: - eSense packet parsing (0xEA / 0xEB / 0xEC)
 
@@ -54,7 +88,9 @@ public final class ThinkGearParser {
             samples.append(value)
         }
 
-        return makeSnapshot(rawEeg: samples)
+        let snapshot = makeSnapshot(rawEeg: samples)
+        detectBlink(samples, at: snapshot.timestamp)
+        return snapshot
     }
 
     // MARK: - Handshake packet builder
@@ -80,7 +116,19 @@ public final class ThinkGearParser {
         poorSignal = Int(bytes[6])
         attention  = Int(bytes[8])
         meditation = Int(bytes[10])
+        signalKnown = true
         return makeSnapshot()
+    }
+
+    private func detectBlink(_ samples: [Int], at timestamp: Int64) {
+        guard signalKnown, poorSignal <= maxPoorSignal else {
+            blinkDetector.reset()  // warm up again once the signal recovers
+            return
+        }
+        let strength = blinkDetector.process(samples)
+        guard strength > 0 else { return }
+        blinkSequence += 1
+        onBlink?(BlinkEvent(timestampMs: timestamp, strength: strength, sequence: blinkSequence))
     }
 
     private func parseEB(_ bytes: [UInt8]) -> BrainWaveData? {

@@ -15,9 +15,11 @@ public final class BLETransport: NSObject, Transport {
 
     public let dataStream: AsyncStream<BrainWaveData>
     public let stateStream: AsyncStream<ConnectionState>
+    public let blinkStream: AsyncStream<BlinkEvent>
 
     private let dataContinuation: AsyncStream<BrainWaveData>.Continuation
     private let stateContinuation: AsyncStream<ConnectionState>.Continuation
+    private let blinkContinuation: AsyncStream<BlinkEvent>.Continuation
 
     // MARK: - Internal state
 
@@ -40,19 +42,25 @@ public final class BLETransport: NSObject, Transport {
     /// Both eSense and RawEEG must be notifying before the connection is considered complete.
     private var notifiedCharacteristics: Set<String> = []
 
-    private let parser = ThinkGearParser()
+    private let parser: ThinkGearParser
 
     // MARK: - Init
 
     public override init() {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
+        var blinkCont: AsyncStream<BlinkEvent>.Continuation!
 
         dataStream  = AsyncStream { dataCont  = $0 }
         stateStream = AsyncStream { stateCont = $0 }
+        blinkStream = AsyncStream { blinkCont = $0 }
 
         dataContinuation  = dataCont
         stateContinuation = stateCont
+        blinkContinuation = blinkCont
+
+        let blinks = blinkCont!
+        parser = ThinkGearParser(onBlink: { blinks.yield($0) })
 
         super.init()
         central = CBCentralManager(delegate: self, queue: .main)
@@ -74,6 +82,7 @@ public final class BLETransport: NSObject, Transport {
     public func connect(to deviceAddress: String, timeout: TimeInterval) async throws {
         targetAddress = deviceAddress
         notifiedCharacteristics.removeAll()
+        parser.reset()  // new connection: restart the blink count and detector
         stateContinuation.yield(.scanning)
 
         try await withCheckedThrowingContinuation { continuation in
