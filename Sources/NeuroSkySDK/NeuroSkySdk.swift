@@ -51,8 +51,8 @@ public final class NeuroSkySdk {
         stateContinuation = stateCont
     }
 
-    /// Initialize in simulator mode — no real headset required.
-    public init(simulator mode: SimulatorTransport.Mode = .random) {
+    /// Test-only: drive the SDK from a `SimulatorTransport` instead of a headset.
+    init(simulator mode: SimulatorTransport.Mode = .random) {
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
         dataStream  = AsyncStream { dataCont  = $0 }
@@ -73,8 +73,7 @@ public final class NeuroSkySdk {
     ///   - deviceAddress: The peripheral name (e.g. `"MindWave Mobile"`) or
     ///     the `CBPeripheral.identifier` UUID string returned by `findDeviceIdentifier(_:timeout:)`.
     ///   - timeout: Maximum seconds to wait for the BLE scan + connect handshake.
-    ///     Throws `BLEError.deviceNotFound` if the timer expires. Ignored in
-    ///     simulator mode. Default: 10 s.
+    ///     Throws `BLEError.deviceNotFound` if the timer expires. Default: 10 s.
     public func connect(
         _ deviceAddress: String,
         timeout: TimeInterval = 10

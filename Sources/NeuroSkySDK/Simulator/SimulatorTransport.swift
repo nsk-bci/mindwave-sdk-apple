@@ -1,10 +1,12 @@
 import Foundation
 
-/// Simulator transport for development without a real headset.
+/// Test-only transport that emits synthetic `BrainWaveData` once per second.
 ///
-/// Emits synthetic `BrainWaveData` once per second.
-/// Recommended for use in `#if DEBUG` blocks only.
-public final class SimulatorTransport: Transport {
+/// Internal: reachable from the test target via `@testable import`. Uses a seeded
+/// generator, so a given seed and mode always produce the same sequence.
+final class SimulatorTransport: Transport {
+
+    static let defaultSeed: UInt64 = 7
 
     // MARK: - Simulator modes
 
@@ -30,12 +32,14 @@ public final class SimulatorTransport: Transport {
     // MARK: - State
 
     private var mode: Mode
+    private var rng: SeededGenerator
     private var timerTask: Task<Void, Never>?
 
     // MARK: - Init
 
-    public init(mode: Mode = .random) {
+    init(mode: Mode = .random, seed: UInt64 = SimulatorTransport.defaultSeed) {
         self.mode = mode
+        self.rng = SeededGenerator(seed: seed)
 
         var dataCont: AsyncStream<BrainWaveData>.Continuation!
         var stateCont: AsyncStream<ConnectionState>.Continuation!
@@ -82,54 +86,55 @@ public final class SimulatorTransport: Transport {
         }
     }
 
-    private func generateData() -> BrainWaveData {
+    /// Internal so tests can draw samples without the 1 s emission delay.
+    func generateData() -> BrainWaveData {
         switch mode {
         case .random:
             return BrainWaveData(
-                poorSignal: Int.random(in: 0...10),
-                attention:  Int.random(in: 20...80),
-                meditation: Int.random(in: 20...80),
-                delta:      Int.random(in: 100_000...500_000),
-                theta:      Int.random(in: 50_000...200_000),
-                lowAlpha:   Int.random(in: 30_000...150_000),
-                highAlpha:  Int.random(in: 30_000...150_000),
-                lowBeta:    Int.random(in: 20_000...100_000),
-                highBeta:   Int.random(in: 10_000...80_000),
-                lowGamma:   Int.random(in: 5_000...50_000),
-                midGamma:   Int.random(in: 5_000...50_000),
-                rawEeg:     (0..<10).map { _ in Int.random(in: -512...512) }
+                poorSignal: Int.random(in: 0...10, using: &rng),
+                attention:  Int.random(in: 20...80, using: &rng),
+                meditation: Int.random(in: 20...80, using: &rng),
+                delta:      Int.random(in: 100_000...500_000, using: &rng),
+                theta:      Int.random(in: 50_000...200_000, using: &rng),
+                lowAlpha:   Int.random(in: 30_000...150_000, using: &rng),
+                highAlpha:  Int.random(in: 30_000...150_000, using: &rng),
+                lowBeta:    Int.random(in: 20_000...100_000, using: &rng),
+                highBeta:   Int.random(in: 10_000...80_000, using: &rng),
+                lowGamma:   Int.random(in: 5_000...50_000, using: &rng),
+                midGamma:   Int.random(in: 5_000...50_000, using: &rng),
+                rawEeg:     (0..<10).map { _ in Int.random(in: -512...512, using: &rng) }
             )
 
         case .focused:
             return BrainWaveData(
                 poorSignal: 0,
-                attention:  Int.random(in: 70...95),
-                meditation: Int.random(in: 40...60),
-                delta:      Int.random(in: 100_000...200_000),
-                theta:      Int.random(in: 80_000...150_000),
-                lowAlpha:   Int.random(in: 50_000...120_000),
-                highAlpha:  Int.random(in: 50_000...120_000),
-                lowBeta:    Int.random(in: 80_000...150_000),
-                highBeta:   Int.random(in: 60_000...120_000),
-                lowGamma:   Int.random(in: 20_000...60_000),
-                midGamma:   Int.random(in: 20_000...60_000),
-                rawEeg:     (0..<10).map { _ in Int.random(in: -256...256) }
+                attention:  Int.random(in: 70...95, using: &rng),
+                meditation: Int.random(in: 40...60, using: &rng),
+                delta:      Int.random(in: 100_000...200_000, using: &rng),
+                theta:      Int.random(in: 80_000...150_000, using: &rng),
+                lowAlpha:   Int.random(in: 50_000...120_000, using: &rng),
+                highAlpha:  Int.random(in: 50_000...120_000, using: &rng),
+                lowBeta:    Int.random(in: 80_000...150_000, using: &rng),
+                highBeta:   Int.random(in: 60_000...120_000, using: &rng),
+                lowGamma:   Int.random(in: 20_000...60_000, using: &rng),
+                midGamma:   Int.random(in: 20_000...60_000, using: &rng),
+                rawEeg:     (0..<10).map { _ in Int.random(in: -256...256, using: &rng) }
             )
 
         case .relaxed:
             return BrainWaveData(
                 poorSignal: 0,
-                attention:  Int.random(in: 20...45),
-                meditation: Int.random(in: 70...95),
-                delta:      Int.random(in: 300_000...600_000),
-                theta:      Int.random(in: 200_000...400_000),
-                lowAlpha:   Int.random(in: 150_000...300_000),
-                highAlpha:  Int.random(in: 150_000...300_000),
-                lowBeta:    Int.random(in: 20_000...60_000),
-                highBeta:   Int.random(in: 10_000...40_000),
-                lowGamma:   Int.random(in: 5_000...20_000),
-                midGamma:   Int.random(in: 5_000...20_000),
-                rawEeg:     (0..<10).map { _ in Int.random(in: -128...128) }
+                attention:  Int.random(in: 20...45, using: &rng),
+                meditation: Int.random(in: 70...95, using: &rng),
+                delta:      Int.random(in: 300_000...600_000, using: &rng),
+                theta:      Int.random(in: 200_000...400_000, using: &rng),
+                lowAlpha:   Int.random(in: 150_000...300_000, using: &rng),
+                highAlpha:  Int.random(in: 150_000...300_000, using: &rng),
+                lowBeta:    Int.random(in: 20_000...60_000, using: &rng),
+                highBeta:   Int.random(in: 10_000...40_000, using: &rng),
+                lowGamma:   Int.random(in: 5_000...20_000, using: &rng),
+                midGamma:   Int.random(in: 5_000...20_000, using: &rng),
+                rawEeg:     (0..<10).map { _ in Int.random(in: -128...128, using: &rng) }
             )
 
         case .poorSignal:
@@ -139,5 +144,22 @@ public final class SimulatorTransport: Transport {
                 meditation: 0
             )
         }
+    }
+}
+
+/// SplitMix64 — small, fast, deterministic generator for reproducible simulator data.
+struct SeededGenerator: RandomNumberGenerator {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed
+    }
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }

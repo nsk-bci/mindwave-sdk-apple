@@ -24,7 +24,7 @@ extension ConnectionState: Equatable {
     }
 }
 
-/// Common protocol shared by BLETransport and SimulatorTransport.
+/// Common protocol for transports (BLETransport; the test-only SimulatorTransport).
 public protocol Transport: AnyObject {
     /// Received BrainWaveData stream
     var dataStream: AsyncStream<BrainWaveData> { get }

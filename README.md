@@ -107,8 +107,6 @@ try await sdk.connect("MindWave Mobile", timeout: 5)   // shorter wait
 try await sdk.connect("MindWave Mobile")               // default 10 s
 ```
 
-The timeout is ignored in simulator mode.
-
 ## Finding Your Device Identifier
 
 CoreBluetooth does not expose MAC addresses. Use `findDeviceIdentifier` to
@@ -181,27 +179,6 @@ for await data in sdk.dataStream where !data.rawEeg.isEmpty {
 }
 ```
 
-## Simulator (without a real device)
-
-```swift
-let sdk = NeuroSkySdk(simulator: .focused)
-
-Task {
-    try await sdk.connect("sim")  // address is ignored
-
-    for await data in sdk.dataStream {
-        print("Attention: \(data.attention)")  // 70–95 range
-    }
-}
-```
-
-| Mode | Attention | Meditation | Use case |
-|---|---|---|---|
-| `.random` | 0~100 (random) | 0~100 (random) | General testing |
-| `.focused` | 70~95 | 40~60 | Focused state UI testing |
-| `.relaxed` | 20~45 | 70~95 | Relaxed state UI testing |
-| `.poorSignal` | 0 | 0 | Signal loss / error handling test |
-
 ## BrainWaveData
 
 | Property | Type | Range | Description |
@@ -237,7 +214,6 @@ try await sdk.stopRawEeg()
 | Transport | Method | Platforms |
 |---|---|---|
 | `BLETransport` | CoreBluetooth GATT | iOS 14+, macOS 11+ |
-| `SimulatorTransport` | Virtual data | iOS + macOS |
 
 ## Project Structure
 
@@ -249,11 +225,9 @@ Sources/NeuroSkySDK/
 │   └── BrainWaveData.swift      EEG data model
 ├── Parser/
 │   └── ThinkGearParser.swift    ThinkGear packet parser
-├── Transport/
-│   ├── Transport.swift          Common protocol, ConnectionState
-│   └── BLETransport.swift       CoreBluetooth implementation (iOS + macOS)
-└── Simulator/
-    └── SimulatorTransport.swift Developer simulator
+└── Transport/
+    ├── Transport.swift          Common protocol, ConnectionState
+    └── BLETransport.swift       CoreBluetooth implementation (iOS + macOS)
 ```
 
 ## Migration
