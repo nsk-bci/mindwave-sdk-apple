@@ -1,0 +1,27 @@
+# TEMPORARY — verifies that SwiftPM resolves a "v"-prefixed tag (v1.0.0) for `from: "1.0.0"`.
+name: SPM v-prefix check
+on: pull_request
+jobs:
+  resolve:
+    runs-on: macos-14
+    steps:
+      - name: Resolve nsk-bci/mindwave-sdk-apple from "1.0.0" in an empty package
+        run: |
+          swift --version
+          mkdir consumer && cd consumer
+          cat > Package.swift <<'SWIFT'
+          // swift-tools-version: 5.7
+          import PackageDescription
+          let package = Package(
+              name: "Consumer",
+              platforms: [.macOS(.v11)],
+              dependencies: [.package(url: "https://github.com/nsk-bci/mindwave-sdk-apple", from: "1.0.0")],
+              targets: [.target(name: "Consumer", dependencies: [.product(name: "NeuroSkySDK", package: "mindwave-sdk-apple")])]
+          )
+          SWIFT
+          mkdir -p Sources/Consumer && echo 'import NeuroSkySDK' > Sources/Consumer/Consumer.swift
+          swift package resolve
+          echo "----- Package.resolved -----"
+          cat Package.resolved
+          grep -q '"version" : "1.0.0"' Package.resolved && echo "RESULT: from \"1.0.0\" resolved to tag v1.0.0"
+          swift build
