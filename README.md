@@ -5,7 +5,7 @@
 [![SPM](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange)](https://github.com/nsk-bci/mindwave-sdk-apple)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
+Modern Swift SDK for the NeuroSky MindWave Mobile 2 EEG headset — Bluetooth Low Energy (BLE) on iOS and macOS.
 
 > [!NOTE]
 > v7.0.0 continues the MindWave SDK line (legacy 4.x), rebuilt from scratch
@@ -17,7 +17,7 @@ Modern Swift SDK for NeuroSky MindWave Mobile EEG headsets — BLE + BT Classic.
 
 > [!TIP]
 > Before diving into the steps — read the [Developer Guide](docs/developer-guide.md) first.
-> It covers the full connection flow, BLE vs BT Classic internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
+> It covers the full connection flow, BLE internals, signal quality handling, packet timing, advanced patterns, and the complete API reference. Most integration questions are answered there.
 
 ### Step 1 — Add the package
 
@@ -47,7 +47,7 @@ targets: [
 <key>NSBluetoothAlwaysUsageDescription</key>
 <string>Bluetooth is required to connect to the MindWave headset.</string>
 
-<!-- App.entitlements (required for BT Classic) -->
+<!-- App.entitlements (required for sandboxed apps) -->
 <key>com.apple.security.device.bluetooth</key>
 <true/>
 ```
@@ -65,7 +65,7 @@ import NeuroSkySDK
 let sdk = NeuroSkySdk()
 
 Task {
-    // BLE (default) — works on iOS and macOS without pairing
+    // BLE — works on iOS and macOS without pairing
     try await sdk.connect("MindWave Mobile")
 
     // Set notch filter for your region (removes power-line noise)
@@ -92,17 +92,11 @@ That's it — three steps from zero to streaming EEG data.
 | macOS | 11.0 |
 | Swift | 5.7+ |
 | Xcode | 14+ |
-| Bluetooth | BLE adapter (BLE mode) or Classic BT adapter (BT Classic mode) |
-| Device pairing | Not required for BLE; required for BT Classic |
+| Bluetooth | BLE adapter |
+| Device pairing | Not required |
+| Headset | MindWave Mobile 2 (MindWave Mobile 1st gen and third-party TGAM boards are not supported) |
 
-## Connection Modes
-
-| Mode | API call | Platforms | Pairing required? |
-|---|---|---|---|
-| BLE (default) | `sdk.connect("MindWave Mobile")` | iOS + macOS | No |
-| BT Classic | `sdk.connect("MindWave Mobile", mode: .btClassic)` | macOS only | Yes |
-
-### Connection timeout
+## Connection timeout
 
 BLE scan + handshake is bounded by a timeout (default **10 seconds**). If the
 headset is off or out of range, `connect()` throws `BLEError.deviceNotFound`
@@ -113,7 +107,7 @@ try await sdk.connect("MindWave Mobile", timeout: 5)   // shorter wait
 try await sdk.connect("MindWave Mobile")               // default 10 s
 ```
 
-The timeout is ignored for BT Classic and simulator modes.
+The timeout is ignored in simulator mode.
 
 ## Finding Your Device Identifier
 
@@ -243,23 +237,21 @@ try await sdk.stopRawEeg()
 | Transport | Method | Platforms |
 |---|---|---|
 | `BLETransport` | CoreBluetooth GATT | iOS 14+, macOS 11+ |
-| `BTClassicTransport` | IOBluetooth RFCOMM SPP | macOS 11+ only |
 | `SimulatorTransport` | Virtual data | iOS + macOS |
 
 ## Project Structure
 
 ```
 Sources/NeuroSkySDK/
-├── NeuroSkySdk.swift            Entry point (@MainActor, TransportMode selection)
+├── NeuroSkySdk.swift            Entry point (@MainActor)
 ├── NeuroSkyUUID.swift           UUID and command constants
 ├── Model/
 │   └── BrainWaveData.swift      EEG data model
 ├── Parser/
 │   └── ThinkGearParser.swift    ThinkGear packet parser
 ├── Transport/
-│   ├── Transport.swift          Common protocol, ConnectionState, TransportMode
-│   ├── BLETransport.swift       CoreBluetooth implementation (iOS + macOS)
-│   └── BTClassicTransport.swift IOBluetooth implementation (macOS only)
+│   ├── Transport.swift          Common protocol, ConnectionState
+│   └── BLETransport.swift       CoreBluetooth implementation (iOS + macOS)
 └── Simulator/
     └── SimulatorTransport.swift Developer simulator
 ```

@@ -24,15 +24,7 @@ extension ConnectionState: Equatable {
     }
 }
 
-/// Selects which Bluetooth transport to use.
-public enum TransportMode {
-    /// BLE via CoreBluetooth. No pairing required. Default. iOS + macOS.
-    case ble
-    /// BT Classic via IOBluetooth RFCOMM SPP. macOS only. Requires pairing in System Settings.
-    case btClassic
-}
-
-/// Common protocol shared by BLETransport, BTClassicTransport, and SimulatorTransport.
+/// Common protocol shared by BLETransport and SimulatorTransport.
 public protocol Transport: AnyObject {
     /// Received BrainWaveData stream
     var dataStream: AsyncStream<BrainWaveData> { get }

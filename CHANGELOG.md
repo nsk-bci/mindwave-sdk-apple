@@ -9,7 +9,10 @@ Releases before 7.0.0 are documented in the [legacy changelog (v1.0.0)](https://
 ## [Unreleased]
 
 ### Removed
-- Bluetooth Classic transport (BLE-only from v7.0.0)
+- Bluetooth Classic transport on macOS (BLE-only from v7.0.0): `BTClassicTransport`, `BTError`,
+  `TransportMode`, `TransportError`, the `mode` argument of `NeuroSkySdk.connect()`,
+  `NeuroSkyUUID.spp`, and the Classic-only `ThinkGearParser` helpers
+  (`updateAndSnapshot(poorSignal:attention:meditation:)`, `parseEEGPowerBT(_:)`)
 
 ### Added
 - eyeBlink parsing
@@ -30,8 +33,7 @@ First release of the renewed MindWave SDK line for iOS and macOS.
 - Swift Package Manager distribution (iOS 14+, macOS 11+)
 - `NeuroSkySdk` (`@MainActor`) with `AsyncStream<BrainWaveData>` data and `AsyncStream<ConnectionState>` state streams
 - `findDeviceIdentifier(_:timeout:)` to look up a peripheral identifier by name
-- BLE transport (CoreBluetooth, iOS + macOS) with a connect timeout: `connect(_:mode:timeout:)` throws `BLEError.deviceNotFound` (default 10 s)
-- Bluetooth Classic (RFCOMM SPP) transport on macOS, selected explicitly with `mode: .btClassic` (no automatic fallback)
+- BLE transport (CoreBluetooth, iOS + macOS) with a connect timeout: `connect(_:timeout:)` throws `BLEError.deviceNotFound` (default 10 s)
 - `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`) and Raw EEG packets
 - Convenience commands: `setNotch50Hz()` / `setNotch60Hz()`, `startRawEeg()` / `stopRawEeg()`
 - `SimulatorTransport` (`.random` / `.focused` / `.relaxed` / `.poorSignal`) for development without a headset

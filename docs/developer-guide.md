@@ -36,7 +36,7 @@ The **NeuroSky MindWave Mobile Apple SDK** is a modern Swift library that lets y
 
 | Feature | Description |
 |---|---|
-| BLE + BT Classic | iOS: BLE. macOS: BLE (default) or BT Classic via `mode: .btClassic` |
+| BLE only | CoreBluetooth on iOS and macOS, no pairing required; Bluetooth Classic is not supported |
 | Swift Concurrency | `AsyncStream<BrainWaveData>` — integrates naturally with SwiftUI `.task {}` |
 | Built-in Simulator | Full data simulation without any hardware |
 | SPM distribution | One-line Package.swift dependency |
@@ -62,14 +62,13 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
 │  ThinkGear ASIC chip                     │
 │    → raw ADC samples (512Hz)             │
 │    → computes FFT + eSense™ internally   │
-│    → transmits via BLE or BT Classic     │
+│    → transmits via BLE                   │
 └────────────────┬─────────────────────────┘
                  │ Bluetooth packets
         ┌────────▼────────┐
         │  Apple          │
         │  Bluetooth APIs │
         │  CoreBluetooth  │
-        │  IOBluetooth    │
         └────────┬────────┘
                  │
         ┌────────▼────────────────────────────────┐
@@ -79,9 +78,6 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
         │   ├── BLETransport                      │
         │   │    CoreBluetooth GATT               │
         │   │    (CBCentralManager + callbacks)   │
-        │   ├── BTClassicTransport (macOS only)   │
-        │   │    IOBluetooth RFCOMM SPP           │
-        │   │    (IOBluetoothRFCOMMChannel)       │
         │   └── SimulatorTransport               │
         │        (virtual data, no hardware)      │
         │          ↓                              │
@@ -98,30 +94,9 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
                 └─────────────────┘
 ```
 
-### BLE vs BT Classic — internal differences
+### BLE data path
 
-**BLE (Bluetooth Low Energy) path — iOS + macOS:**
-The MindWave Mobile exposes three BLE GATT characteristics. The SDK subscribes to notifications on the eSense (`039afff8`) and RawEEG (`039afff4`) characteristics, then writes the handshake command byte to the handshake characteristic (`039affa0`) to start data flow. No pairing is required.
-
-**BT Classic (RFCOMM SPP) path — macOS only:**
-The MindWave Mobile emulates a serial port (SPP UUID `00001101-...`). The SDK opens an `IOBluetoothRFCOMMChannel` and reads a continuous byte stream. `ThinkGearParser` synchronizes on the `0xAA 0xAA` sync header. The device must be paired in macOS Bluetooth settings first.
-
-Both paths produce identical `BrainWaveData` output through the same `dataStream`.
-
-### Transport selection
-
-`NeuroSkySdk.connect(_:mode:)` accepts an explicit `TransportMode`:
-
-```swift
-// BLE — default, works on iOS + macOS, no pairing required
-try await sdk.connect("MindWave Mobile")                          // mode: .ble
-try await sdk.connect("MindWave Mobile", mode: .ble)
-
-// BT Classic — macOS only, headset must be paired in System Settings first
-try await sdk.connect("MindWave Mobile", mode: .btClassic)
-```
-
-Both modes produce identical `BrainWaveData` through the same `dataStream`. On iOS, passing `mode: .btClassic` throws `TransportError.btClassicNotAvailableOniOS`.
+The MindWave Mobile 2 exposes three BLE GATT characteristics. The SDK subscribes to notifications on the eSense (`039afff8`) and RawEEG (`039afff4`) characteristics, then writes the handshake command byte to the handshake characteristic (`039affa0`) to start data flow. No pairing is required.
 
 ---
 
@@ -133,12 +108,12 @@ Both modes produce identical `BrainWaveData` through the same `dataStream`. On i
 | macOS | 11.0 (Big Sur) |
 | Swift | 5.7+ |
 | Xcode | 14+ |
-| Bluetooth | BLE adapter (BLE mode) or Classic BT (BT Classic mode, macOS only) |
-| Pairing | Not required for BLE; required for BT Classic |
+| Bluetooth | BLE adapter |
+| Pairing | Not required |
 
 ### Supported headset
 
-This SDK is designed and tested for the **NeuroSky MindWave Mobile 2**. Both BLE and BT Classic modes are supported on macOS. iOS supports BLE only.
+This SDK is designed and tested for the **NeuroSky MindWave Mobile 2** over BLE. MindWave Mobile 1st gen and third-party TGAM boards are not supported.
 
 ---
 
@@ -199,13 +174,13 @@ CoreBluetooth will display a system permission dialog the first time your app in
 <string>Bluetooth is required to connect to the MindWave headset.</string>
 ```
 
-**App.entitlements (required for BT Classic via IOBluetooth):**
+**App.entitlements (required for sandboxed apps):**
 ```xml
 <key>com.apple.security.device.bluetooth</key>
 <true/>
 ```
 
-> Sandboxed macOS apps (required for Mac App Store distribution) must include `com.apple.security.device.bluetooth`. Without it, IOBluetooth calls will silently fail.
+> Sandboxed macOS apps (required for Mac App Store distribution) must include `com.apple.security.device.bluetooth`. Without it, CoreBluetooth cannot reach the headset.
 
 ---
 
@@ -305,10 +280,6 @@ try await sdk.connect("MindWave Mobile")
 
 // By BLE peripheral UUID (faster — skip scan)
 try await sdk.connect("12345678-1234-1234-1234-123456789ABC")
-
-// macOS BT Classic: by device name or Bluetooth address
-try await sdk.connect("MindWave Mobile")
-try await sdk.connect("AA:BB:CC:DD:EE:FF")
 ```
 
 ---
@@ -479,10 +450,6 @@ Task {
         showAlert("Headset not found within timeout — is it on and nearby?")
     } catch BLEError.connectionFailed {
         showAlert("Connection failed — is the headset on and nearby?")
-    } catch BTError.deviceNotFound {
-        showAlert("Device not found — pair it in macOS Bluetooth settings first")
-    } catch TransportError.btClassicNotAvailableOniOS {
-        showAlert("BT Classic is only supported on macOS — use BLE instead")
     } catch {
         showAlert("Unexpected error: \(error)")
     }
@@ -503,7 +470,7 @@ try await sdk.connect("MindWave Mobile")
 try await sdk.connect("MindWave Mobile", timeout: 5)
 ```
 
-The timeout applies to BLE only. BT Classic and simulator modes ignore it.
+Simulator mode ignores the timeout.
 
 ### Automatic reconnection
 
@@ -707,13 +674,7 @@ for await data in sdk.dataStream {
 - The device may already be connected to another host — power cycle the headset
 - Try moving within 1 meter of the headset
 - Disable and re-enable Bluetooth in macOS System Settings
-- If the issue persists, try BT Classic on macOS: `sdk.connect("MindWave Mobile", mode: .btClassic)`
-
-### BT Classic "device not found" on macOS
-
-- Open **System Settings → Bluetooth** and pair the MindWave Mobile before connecting
-- The device must appear as paired (not just discovered) in the macOS Bluetooth list
-- Ensure `com.apple.security.device.bluetooth` is in your app's entitlements
+- Sandboxed apps: ensure `com.apple.security.device.bluetooth` is in your app's entitlements
 
 ### `@MainActor` concurrency warnings
 
@@ -801,14 +762,11 @@ public final class NeuroSkySdk {
     /// Initialize in simulator mode (no hardware required)
     public init(simulator mode: SimulatorTransport.Mode)
 
-    /// Connect to headset by name or address
-    /// - iOS: BLE only
-    /// - mode: Transport to use. Defaults to `.ble`. Pass `.btClassic` on macOS for SPP.
+    /// Connect to headset over BLE by name or peripheral UUID string
     /// - timeout: Max seconds to wait for BLE scan + handshake. Throws
-    ///   `BLEError.deviceNotFound` on expiry. Default 10. Ignored for BT Classic and simulator.
+    ///   `BLEError.deviceNotFound` on expiry. Default 10. Ignored in simulator mode.
     public func connect(
         _ deviceAddress: String,
-        mode: TransportMode = .ble,
         timeout: TimeInterval = 10
     ) async throws
 
@@ -904,23 +862,5 @@ public enum BLEError: Error {
     case bluetoothUnavailable           // Bluetooth is off or restricted
     case connectionFailed               // GATT connection failed
     case deviceNotFound                 // No matching peripheral found during scan
-}
-
-public enum BTError: Error {
-    case deviceNotFound                 // Not found in paired device list (macOS)
-    case connectionFailed               // RFCOMM channel failed to open
-}
-
-public enum TransportError: Error {
-    case btClassicNotAvailableOniOS     // .btClassic mode is macOS only
-}
-```
-
-### `TransportMode`
-
-```swift
-public enum TransportMode {
-    case ble        // CoreBluetooth GATT — iOS + macOS, no pairing required (default)
-    case btClassic  // IOBluetooth RFCOMM SPP — macOS only, requires pairing
 }
 ```
