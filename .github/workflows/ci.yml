@@ -22,8 +22,9 @@ jobs:
       - name: Build Tests (macOS)
         run: swift build --build-tests
 
-      - name: Test — Parser (macOS)
-        run: swift test --filter ThinkGearParserTests
+      # All suites: parser, simulator determinism, simulator integration
+      - name: Test (macOS)
+        run: swift test
 
       # iOS: compile-check against the iOS Simulator SDK using swift build
       - name: Build (iOS Simulator)

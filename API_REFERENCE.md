@@ -11,9 +11,6 @@ Main entry point. `@MainActor` class.
 ```swift
 // Connect to a real headset
 init()
-
-// Simulator mode — no headset required
-init(simulator mode: SimulatorTransport.Mode = .random)
 ```
 
 ### Properties
@@ -128,35 +125,6 @@ public enum ConnectionState {
 | `esense` | 039afff8-2c94-11e3-9e06-0002a5d5c51b |
 | `handshake` | 039affa0-2c94-11e3-9e06-0002a5d5c51b |
 | `rawEeg` | 039afff4-2c94-11e3-9e06-0002a5d5c51b |
-
----
-
-## SimulatorTransport
-
-Transport for development without a real headset. Emits synthetic data once per second. Recommended for `#if DEBUG` blocks only.
-
-Use via `NeuroSkySdk(simulator:)` — direct instantiation is also supported for custom injection.
-
-### Initializer
-
-```swift
-init(mode: SimulatorTransport.Mode = .random)
-```
-
-### Methods
-
-| Method | Description |
-|--------|-------------|
-| `setMode(_ mode: Mode)` | Change the simulation mode at runtime |
-
-### SimulatorTransport.Mode
-
-| Mode | `attention` | `meditation` | Description |
-|------|-------------|--------------|-------------|
-| `.random` | 20–80 | 20–80 | Random values, `poorSignal` 0–10 |
-| `.focused` | 70–95 | 40–60 | Focused state, `poorSignal` = 0 |
-| `.relaxed` | 20–45 | 70–95 | Relaxed state, `poorSignal` = 0 |
-| `.poorSignal` | 0 | 0 | No signal, `poorSignal` = 200 |
 
 ---
 

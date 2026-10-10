@@ -13,6 +13,8 @@ Releases before 7.0.0 are documented in the [legacy changelog (v1.0.0)](https://
   `TransportMode`, `TransportError`, the `mode` argument of `NeuroSkySdk.connect()`,
   `NeuroSkyUUID.spp`, and the Classic-only `ThinkGearParser` helpers
   (`updateAndSnapshot(poorSignal:attention:meditation:)`, `parseEEGPowerBT(_:)`)
+- `NeuroSkySdk(simulator:)` and `SimulatorTransport` from the public API: the simulator is now internal and
+  test-only (deterministic, seeded)
 
 ### Added
 - eyeBlink parsing
@@ -36,7 +38,6 @@ First release of the renewed MindWave SDK line for iOS and macOS.
 - BLE transport (CoreBluetooth, iOS + macOS) with a connect timeout: `connect(_:timeout:)` throws `BLEError.deviceNotFound` (default 10 s)
 - `ThinkGearParser` for BLE eSense (`0xEA`/`0xEB`/`0xEC`) and Raw EEG packets
 - Convenience commands: `setNotch50Hz()` / `setNotch60Hz()`, `startRawEeg()` / `stopRawEeg()`
-- `SimulatorTransport` (`.random` / `.focused` / `.relaxed` / `.poorSignal`) for development without a headset
 - `PrivacyInfo.xcprivacy` (no tracking, no data collection)
 - `NOTICE`
 

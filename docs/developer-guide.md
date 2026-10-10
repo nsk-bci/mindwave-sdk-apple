@@ -19,12 +19,11 @@ title: NeuroSky MindWave Mobile Apple SDK — Developer Guide
 8. [EEG Frequency Bands Explained](#8-eeg-frequency-bands-explained)
 9. [Signal Quality](#9-signal-quality)
 10. [Commands](#10-commands)
-11. [Simulator — Develop Without Hardware](#11-simulator--develop-without-hardware)
-12. [Error Handling & Reconnection](#12-error-handling--reconnection)
-13. [Advanced Patterns](#13-advanced-patterns) — device finder, dataStream timing, Combine, Raw EEG
-14. [Troubleshooting](#14-troubleshooting)
-15. [Testing](#15-testing)
-16. [API Reference](#16-api-reference)
+11. [Error Handling & Reconnection](#11-error-handling--reconnection)
+12. [Advanced Patterns](#12-advanced-patterns) — device finder, dataStream timing, Combine, Raw EEG
+13. [Troubleshooting](#13-troubleshooting)
+14. [Testing](#14-testing)
+15. [API Reference](#15-api-reference)
 
 ---
 
@@ -38,7 +37,6 @@ The **NeuroSky MindWave Mobile Apple SDK** is a modern Swift library that lets y
 |---|---|
 | BLE only | CoreBluetooth on iOS and macOS, no pairing required; Bluetooth Classic is not supported |
 | Swift Concurrency | `AsyncStream<BrainWaveData>` — integrates naturally with SwiftUI `.task {}` |
-| Built-in Simulator | Full data simulation without any hardware |
 | SPM distribution | One-line Package.swift dependency |
 | iOS 14+ / macOS 11+ | Wide platform coverage |
 
@@ -78,8 +76,6 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
         │   ├── BLETransport                      │
         │   │    CoreBluetooth GATT               │
         │   │    (CBCentralManager + callbacks)   │
-        │   └── SimulatorTransport               │
-        │        (virtual data, no hardware)      │
         │          ↓                              │
         │   ThinkGearParser                       │
         │    decodes 0xEA / 0xEB / 0xEC packets   │
@@ -404,37 +400,7 @@ try await sdk.sendCommand(NeuroSkyCommand.stopEsense)
 
 ---
 
-## 11. Simulator — Develop Without Hardware
-
-`SimulatorTransport` generates realistic synthetic `BrainWaveData` at 1-second intervals without any Bluetooth hardware.
-
-```swift
-// Initialize SDK in simulator mode
-let sdk = NeuroSkySdk(simulator: .focused)
-
-Task {
-    try await sdk.connect("sim")  // address string is ignored
-
-    for await data in sdk.dataStream {
-        print("Attention: \(data.attention)")  // 70–95 in .focused mode
-    }
-}
-```
-
-### Available modes
-
-| Mode | `attention` | `meditation` | `poorSignal` | Use case |
-|---|---|---|---|---|
-| `.random` | 20~80 | 20~80 | 0~10 | General data flow testing |
-| `.focused` | 70~95 | 40~60 | 0 | Focused state UI testing |
-| `.relaxed` | 20~45 | 70~95 | 0 | Relaxed state UI testing |
-| `.poorSignal` | 0 | 0 | 200 | Signal loss and error handling |
-
-The simulator is available in both debug and release builds. Use `#if DEBUG` to restrict it to development if desired.
-
----
-
-## 12. Error Handling & Reconnection
+## 11. Error Handling & Reconnection
 
 ### Connection errors
 
@@ -469,8 +435,6 @@ try await sdk.connect("MindWave Mobile")
 // Custom — useful when retrying or when you know the device is nearby
 try await sdk.connect("MindWave Mobile", timeout: 5)
 ```
-
-Simulator mode ignores the timeout.
 
 ### Automatic reconnection
 
@@ -516,7 +480,7 @@ Task {
 
 ---
 
-## 13. Advanced Patterns
+## 12. Advanced Patterns
 
 ### Finding a device by name — `findDeviceIdentifier`
 
@@ -660,14 +624,13 @@ for await data in sdk.dataStream {
 
 ---
 
-## 14. Troubleshooting
+## 13. Troubleshooting
 
 ### "No signal" immediately after connecting
 
 - Ensure the headset is on your forehead, not just held in your hand
 - The metal electrode must touch your skin — push hair aside
 - Moisten the ear clip contact slightly
-- Try `poorSignal` simulator mode to confirm your UI handles `.noSignal` correctly
 
 ### BLE connection times out on macOS
 
@@ -694,21 +657,13 @@ Task { @MainActor in
 
 ### iOS Simulator
 
-CoreBluetooth does not work in the iOS Simulator. Use `NeuroSkySdk(simulator:)` for development without a physical device:
-
-```swift
-#if targetEnvironment(simulator)
-let sdk = NeuroSkySdk(simulator: .focused)
-#else
-let sdk = NeuroSkySdk()
-#endif
-```
+CoreBluetooth does not work in the iOS Simulator. Run on a physical iPhone or iPad, or on a Mac.
 
 ---
 
-## 15. Testing
+## 14. Testing
 
-The SDK ships with two test suites:
+The SDK ships with a unit test suite:
 
 ### Unit tests — `ThinkGearParserTests`
 
@@ -718,21 +673,6 @@ Tests for the packet parser covering:
 - Raw EEG: 10-sample parsing with sign correction
 - Handshake packet: 20-byte structure and checksum
 
-### Integration tests — `SimulatorIntegrationTests`
-
-Virtual device tests covering the full lifecycle:
-
-| Test | Verifies |
-|---|---|
-| `test_connect_yieldsConnectingThenConnected` | State sequence on connect |
-| `test_disconnect_yieldsDisconnected` | State on disconnect |
-| `test_focused_attentionInExpectedRange` | `.focused` mode value ranges |
-| `test_relaxed_meditationInExpectedRange` | `.relaxed` mode value ranges |
-| `test_poorSignal_signalQualityIsNoSignal` | `.poorSignal` mode + `.noSignal` quality |
-| `test_rawEeg_has10SamplesPerPacket` | 10 samples per packet |
-| `test_rawEeg_samplesInValidRange` | Sample range (-512~512) |
-| `test_receivesMultiplePacketsOverTime` | ≥2 packets in 4 seconds |
-| `test_sendCommand_doesNotThrow` | All commands succeed |
 
 Run tests:
 
@@ -742,7 +682,7 @@ swift test
 
 ---
 
-## 16. API Reference
+## 15. API Reference
 
 ### `NeuroSkySdk`
 
@@ -759,12 +699,10 @@ public final class NeuroSkySdk {
     /// Initialize for real device connection
     public init()
 
-    /// Initialize in simulator mode (no hardware required)
-    public init(simulator mode: SimulatorTransport.Mode)
 
     /// Connect to headset over BLE by name or peripheral UUID string
     /// - timeout: Max seconds to wait for BLE scan + handshake. Throws
-    ///   `BLEError.deviceNotFound` on expiry. Default 10. Ignored in simulator mode.
+    ///   `BLEError.deviceNotFound` on expiry. Default 10.
     public func connect(
         _ deviceAddress: String,
         timeout: TimeInterval = 10
@@ -828,17 +766,6 @@ public enum SignalQuality: Equatable {
     case fair       // poorSignal 1~50
     case poor       // poorSignal 51~199
     case noSignal   // poorSignal == 200
-}
-```
-
-### `SimulatorTransport.Mode`
-
-```swift
-public enum Mode {
-    case random      // randomized values
-    case focused     // high attention, mid meditation
-    case relaxed     // low attention, high meditation
-    case poorSignal  // poorSignal = 200, all zeros
 }
 ```
 
