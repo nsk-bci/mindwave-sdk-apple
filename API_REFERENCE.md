@@ -19,6 +19,7 @@ init()
 |----------|------|-------------|
 | `dataStream` | `AsyncStream<BrainWaveData>` | EEG data stream |
 | `stateStream` | `AsyncStream<ConnectionState>` | Connection state stream |
+| `blinkStream` | `AsyncStream<BlinkEvent>` | Eye blink events — requires `startRawEeg()`; silent while `signalQuality` is `.poor`/`.noSignal` |
 
 ### Methods
 
@@ -75,6 +76,18 @@ Cache the returned UUID to avoid scanning on every app launch.
 | `midGamma` | `Int` | 0+ | Mid gamma band power (41–49.75 Hz) |
 | `rawEeg` | `[Int]` | −32768–32767 | 10 samples per packet at 512 Hz |
 | `signalQuality` | `SignalQuality` | — | Computed from `poorSignal` |
+
+---
+
+## BlinkEvent
+
+```swift
+public struct BlinkEvent: Sendable, Equatable {
+    public let timestampMs: Int64   // detection time (Unix epoch ms)
+    public let strength: Int        // raw EEG peak-to-peak amplitude of the detection window
+    public let sequence: Int        // blinks since connect(), starting at 1
+}
+```
 
 ---
 

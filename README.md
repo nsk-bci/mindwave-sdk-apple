@@ -197,6 +197,37 @@ for await data in sdk.dataStream where !data.rawEeg.isEmpty {
 | `rawEeg` | `[Int]` | -32768~32767 | 512 Hz, 10 samples/packet |
 | `signalQuality` | `SignalQuality` | enum | `.noSignal` / `.poor` / `.fair` / `.good` |
 
+## Eye Blink Detection
+
+Blinks are detected in the raw EEG stream and delivered on a separate `blinkStream`, one `BlinkEvent` per
+blink, because several blinks can occur within the ~1 s between eSense packets.
+
+```swift
+try await sdk.startRawEeg()   // detection needs the raw EEG stream
+
+for await blink in sdk.blinkStream {
+    print("Blink #\(blink.sequence) at \(blink.timestampMs), strength \(blink.strength)")
+}
+```
+
+| `BlinkEvent` property | Type | Meaning |
+|---|---|---|
+| `timestampMs` | `Int64` | Detection time (Unix epoch ms) |
+| `strength` | `Int` | Raw EEG peak-to-peak amplitude of the detection window |
+| `sequence` | `Int` | Blinks since `connect()`, starting at 1 |
+
+Detection runs only while the raw EEG stream is on and signal quality is `.good` or `.fair`
+(`poorSignal` ≤ 50). It pauses during `.poor` / `.noSignal`, because electrode contact noise looks like a blink.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Window | 100 samples (~200 ms) | Peak-to-peak is measured over the most recent samples |
+| Threshold | 3000 (provisional) | Minimum peak-to-peak amplitude, in raw EEG units — to be confirmed by on-device measurement |
+| Cooldown | 600 ms | At most one blink is reported per cooldown |
+| Warm-up | 500 ms | No detection right after the stream starts, after a gap of more than 1 s, or after signal quality recovers |
+
+In simulator mode `blinkStream` emits nothing.
+
 ## Commands
 
 ```swift

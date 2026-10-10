@@ -48,6 +48,7 @@ The MindWave Mobile headset contains a single dry electrode on the forehead (FP1
 - **8 frequency band powers** — Delta, Theta, Alpha (Low/High), Beta (Low/High), Gamma (Low/Mid)
 - **eSense™ Attention** — NeuroSky's proprietary attention index (0~100)
 - **eSense™ Meditation** — NeuroSky's proprietary relaxation index (0~100)
+- **Eye blink detection** — detected from raw EEG; delivered as `BlinkEvent`s on `blinkStream`
 - **Signal quality** — 0 (perfect contact) to 200 (no signal)
 
 ---
@@ -695,6 +696,9 @@ public final class NeuroSkySdk {
 
     /// Stream of connection state changes
     public let stateStream: AsyncStream<ConnectionState>
+
+    /// Stream of eye blink events (requires startRawEeg(); silent while signal is poor)
+    public let blinkStream: AsyncStream<BlinkEvent>
 
     /// Initialize for real device connection
     public init()
