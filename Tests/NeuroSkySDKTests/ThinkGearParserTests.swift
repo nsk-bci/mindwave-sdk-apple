@@ -13,7 +13,7 @@ final class ThinkGearParserTests: XCTestCase {
 
     func test_parseEA_extractsAttentionMeditationPoorSignal() {
         var bytes = [UInt8](repeating: 0, count: 11)
-        bytes[0]  = 0xEA
+        bytes[2]  = 0xEA  // packet type follows the 2-byte prefix (00 00)
         bytes[6]  = 30   // poorSignal
         bytes[8]  = 75   // attention
         bytes[10] = 60   // meditation
@@ -35,7 +35,7 @@ final class ThinkGearParserTests: XCTestCase {
 
     func test_parseEB_extractsFrequencyBand1() {
         var bytes = [UInt8](repeating: 0, count: 20)
-        bytes[0] = 0xEB
+        bytes[2] = 0xEB  // packet type follows the 2-byte prefix (00 00)
         // Delta: offset 5~7 = 0x01, 0x86, 0xA0 → 100000
         bytes[5] = 0x01; bytes[6] = 0x86; bytes[7] = 0xA0
         // Theta: offset 9~11 = 0x00, 0xC3, 0x50 → 50000
@@ -46,6 +46,42 @@ final class ThinkGearParserTests: XCTestCase {
         XCTAssertNotNil(result)
         XCTAssertEqual(result?.delta, 100000)
         XCTAssertEqual(result?.theta, 50000)
+    }
+
+    // MARK: - Real-device captures (MWM2, 2026-06-05 — same packets as the Windows SDK tests)
+    //
+    // Actual 20-byte payloads sent by an MWM2 over BLE (2-byte prefix + type at index 2).
+    // A parser that reads the type from bytes[0] returns nil for all of them.
+
+    func test_parseEA_realDevicePacket_extractsAttentionMeditation() {
+        // 00 00 EA 00 00 02 <poor> 04 <att> 05 <med> ...
+        let bytes: [UInt8] = [
+            0x00, 0x00, 0xEA, 0x00, 0x00, 0x02, 0x00, 0x04, 0x40, 0x05,
+            0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]
+
+        let result = parser.parseEsense(Data(bytes))
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.poorSignal, 0)
+        XCTAssertEqual(result?.attention, 64)   // 0x40
+        XCTAssertEqual(result?.meditation, 47)  // 0x2F
+    }
+
+    func test_parseEB_realDevicePacket_extractsBands() {
+        // 00 00 EB 00 06 03 E6 30 07 00 81 BA 08 00 13 40 09 00 27 4E
+        let bytes: [UInt8] = [
+            0x00, 0x00, 0xEB, 0x00, 0x06, 0x03, 0xE6, 0x30, 0x07, 0x00,
+            0x81, 0xBA, 0x08, 0x00, 0x13, 0x40, 0x09, 0x00, 0x27, 0x4E,
+        ]
+
+        let result = parser.parseEsense(Data(bytes))
+
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result?.delta, 0x03E630)
+        XCTAssertEqual(result?.theta, 0x0081BA)
+        XCTAssertEqual(result?.lowAlpha, 0x001340)
+        XCTAssertEqual(result?.highAlpha, 0x00274E)
     }
 
     // MARK: - Raw EEG
